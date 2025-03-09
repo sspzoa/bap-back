@@ -6,7 +6,7 @@ interface CacheItem<T> {
 
 export class MemoryCache {
   private cache: Map<string, CacheItem<any>> = new Map();
-  private readonly TTL: number = 24 * 60 * 60 * 1000; // 24시간 기본 TTL
+  private readonly TTL: number = 24 * 60 * 60 * 1000;
 
   get<T>(key: string): T | undefined {
     const item = this.cache.get(key);
@@ -50,5 +50,4 @@ export class MemoryCache {
   }
 }
 
-// 싱글톤 인스턴스
 export const memoryCache = new MemoryCache();

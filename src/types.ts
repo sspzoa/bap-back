@@ -1,7 +1,3 @@
-/**
- * 전역적으로 사용되는 타입 정의
- */
-
 export interface MealMenu {
   breakfast: string;
   lunch: string;

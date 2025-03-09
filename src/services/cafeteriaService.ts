@@ -5,10 +5,6 @@ import { fetchWithTimeout } from '../utils/fetchUtils';
 import { getKSTDate, formatDate } from '../utils/dateUtils';
 import { memoryCache } from '../utils/cache-utils';
 
-/**
- * 식단 게시판 목록에서 document_srl 등을 추출
- * @param pageUrl - (선택) 식단 게시판 URL
- */
 export async function getLatestMenuDocumentIds(
   pageUrl = `${CONFIG.BASE_URL}?mid=${CONFIG.CAFETERIA_PATH}`
 ): Promise<MenuPost[]> {
@@ -47,7 +43,6 @@ export async function getLatestMenuDocumentIds(
       .get()
       .filter((post): post is MenuPost => post !== null);
 
-    // 캐시에 저장
     memoryCache.set(cacheKey, posts);
 
     return posts;
@@ -57,28 +52,18 @@ export async function getLatestMenuDocumentIds(
   }
 }
 
-/**
- * 게시글 중에서 요청한 날짜(YYYY-MM-DD)에 해당하는 post 찾기
- * @param menuPosts - 식단 게시판 목록
- * @param dateParam - 'YYYY-MM-DD' 형태
- */
 export function findTargetPost(menuPosts: MenuPost[], dateParam: string): MenuPost | undefined {
   return menuPosts.find(post => {
     const match = post.title.match(/(\d+)월\s*(\d+)일/);
     if (!match) return false;
 
-    const [, month, day] = match; // ex) month="3", day="15"
+    const [, month, day] = match;
     const currentYear = getKSTDate().getFullYear();
     const postDate = new Date(currentYear, parseInt(month) - 1, parseInt(day));
     return formatDate(postDate) === formatDate(new Date(dateParam));
   });
 }
 
-/**
- * 하나의 요청으로 식단 텍스트 + 이미지를 모두 파싱
- * @param documentId - 게시글 document_srl
- * @returns { menu: MealMenu, images: MealImages }
- */
 export async function getMealData(documentId: string): Promise<{ menu: MealMenu; images: MealImages }> {
   const cacheKey = `meal_data_${documentId}`;
   const cachedData = memoryCache.get<{ menu: MealMenu; images: MealImages }>(cacheKey);
@@ -118,9 +103,6 @@ export async function getMealData(documentId: string): Promise<{ menu: MealMenu;
       dinner: getMealText(CONFIG.MEAL_TYPES.DINNER)
     };
 
-    // ------------------
-    // 식단 이미지 파싱
-    // ------------------
     const images: MealImages = {
       breakfast: '',
       lunch: '',
@@ -144,7 +126,6 @@ export async function getMealData(documentId: string): Promise<{ menu: MealMenu;
 
     const result = { menu, images };
 
-    // 캐시에 저장
     memoryCache.set(cacheKey, result);
 
     return result;
