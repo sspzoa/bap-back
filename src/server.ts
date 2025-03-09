@@ -1,6 +1,8 @@
 import { serve } from 'bun'; // Bun 환경
 import { handleCafeteriaRequest } from './routes/cafeteriaRoute';
 import { CONFIG } from './config';
+import { setupCronJob } from './utils/cron';
+import { memoryCache } from './utils/cache-utils';
 
 /**
  * Bun 서버 설정
@@ -16,7 +18,7 @@ export const server = serve({
     // CORS 헤더 설정
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     };
 
@@ -25,6 +27,32 @@ export const server = serve({
       return new Response(null, {
         status: 204,
         headers: corsHeaders
+      });
+    }
+
+    // 캐시 비우기 엔드포인트
+    if (path === '/clear-cache' && req.method === 'POST') {
+      memoryCache.clear();
+      return new Response(JSON.stringify({ success: true, message: 'Cache cleared' }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+
+    // 상태 확인 엔드포인트
+    if (path === '/health') {
+      return new Response(JSON.stringify({
+        status: 'ok',
+        cacheStatus: {
+          menu_posts: memoryCache.has('cafeteria_menu_posts')
+        }
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
       });
     }
 
@@ -59,3 +87,5 @@ export const server = serve({
   },
 });
 
+// 크론 작업 설정 (30분마다 캐시 갱신)
+setupCronJob(30 * 60 * 1000);

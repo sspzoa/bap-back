@@ -3,6 +3,7 @@ import type {MenuPost, MealMenu, MealImages} from '../types';
 import { CONFIG } from '../config';
 import { fetchWithTimeout } from '../utils/fetchUtils';
 import { getKSTDate, formatDate } from '../utils/dateUtils';
+import { memoryCache } from '../utils/cache-utils';
 
 /**
  * 식단 게시판 목록에서 document_srl 등을 추출
@@ -11,6 +12,14 @@ import { getKSTDate, formatDate } from '../utils/dateUtils';
 export async function getLatestMenuDocumentIds(
   pageUrl = `${CONFIG.BASE_URL}?mid=${CONFIG.CAFETERIA_PATH}`
 ): Promise<MenuPost[]> {
+  const cacheKey = 'cafeteria_menu_posts';
+  const cachedData = memoryCache.get<MenuPost[]>(cacheKey);
+
+  if (cachedData) {
+    console.log('Using cached menu posts data');
+    return cachedData;
+  }
+
   try {
     const response = await fetchWithTimeout(pageUrl);
     if (!response.ok) {
@@ -20,7 +29,7 @@ export async function getLatestMenuDocumentIds(
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    return $('.scContent .scEllipsis a')
+    const posts = $('.scContent .scEllipsis a')
       .map((_, element) => {
         const link = $(element).attr('href');
         const documentId = link?.match(/document_srl=(\d+)/)?.[1];
@@ -37,6 +46,11 @@ export async function getLatestMenuDocumentIds(
       })
       .get()
       .filter((post): post is MenuPost => post !== null);
+
+    // 캐시에 저장
+    memoryCache.set(cacheKey, posts);
+
+    return posts;
   } catch (error) {
     console.error('Error fetching menu documents:', error);
     throw new Error('Failed to fetch menu documents');
@@ -66,6 +80,14 @@ export function findTargetPost(menuPosts: MenuPost[], dateParam: string): MenuPo
  * @returns { menu: MealMenu, images: MealImages }
  */
 export async function getMealData(documentId: string): Promise<{ menu: MealMenu; images: MealImages }> {
+  const cacheKey = `meal_data_${documentId}`;
+  const cachedData = memoryCache.get<{ menu: MealMenu; images: MealImages }>(cacheKey);
+
+  if (cachedData) {
+    console.log(`Using cached meal data for document ${documentId}`);
+    return cachedData;
+  }
+
   try {
     const url = `${CONFIG.BASE_URL}?mid=${CONFIG.CAFETERIA_PATH}&document_srl=${documentId}`;
     const response = await fetchWithTimeout(url);
@@ -120,7 +142,12 @@ export async function getMealData(documentId: string): Promise<{ menu: MealMenu;
       }
     });
 
-    return { menu, images };
+    const result = { menu, images };
+
+    // 캐시에 저장
+    memoryCache.set(cacheKey, result);
+
+    return result;
   } catch (error) {
     console.error('Error fetching meal data:', error);
     throw new Error('Failed to fetch meal data');

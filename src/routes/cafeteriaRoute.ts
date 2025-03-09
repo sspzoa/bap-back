@@ -1,11 +1,10 @@
-import { MenuCache } from '../cache/menuCache';
+import { memoryCache } from '../utils/cache-utils';
 import { getLatestMenuDocumentIds, findTargetPost, getMealData } from '../services/cafeteriaService';
 import { isValidDate } from '../utils/dateUtils';
 
 /**
- * 식단 API 라우트 예시
+ * 식단 API 라우트
  * - "/YYYY-MM-DD" 형태의 요청을 처리
- * - express, Koa, Bun 등에 맞춰 적절히 수정하세요
  */
 export async function handleCafeteriaRequest(dateParam: string) {
   try {
@@ -17,8 +16,8 @@ export async function handleCafeteriaRequest(dateParam: string) {
     }
 
     // 캐시 체크
-    const menuCache = MenuCache.getInstance();
-    const cachedData = menuCache.get(dateParam);
+    const cacheKey = `cafeteria_${dateParam}`;
+    const cachedData = memoryCache.get(cacheKey);
     if (cachedData) {
       return {
         status: 200,
@@ -41,7 +40,7 @@ export async function handleCafeteriaRequest(dateParam: string) {
     const responseData = { ...menu, images };
 
     // 캐시에 저장
-    menuCache.set(dateParam, responseData);
+    memoryCache.set(cacheKey, responseData);
 
     return {
       status: 200,
