@@ -1,5 +1,5 @@
 import type {CacheEntry} from '../types';
-import { formatDate, getKSTDate, getKSTTimestamp } from '../utils/dateUtils';
+import { getKSTTimestamp } from '../utils/dateUtils';
 
 /**
  * 식단 정보 캐싱을 위한 싱글턴 클래스
@@ -12,10 +12,8 @@ export class MenuCache {
   // 실제 캐시 데이터를 저장하는 Map
   private cache: Map<string, CacheEntry> = new Map();
 
-  // 기본 캐시 기간(24시간)
+  // 모든 데이터에 대한 일괄 캐시 기간(24시간)
   private readonly CACHE_DURATION = 1000 * 60 * 60 * 24;
-  // 오늘 날짜에 대해서만 짧게 캐싱(5분) - 메뉴 사진 업데이트 반영
-  private readonly TODAY_CACHE_DURATION = 1000 * 60 * 5;
 
   private constructor() {
     // private 생성자로 외부에서 new 호출 불가
@@ -52,14 +50,11 @@ export class MenuCache {
    */
   set(key: string, data: any): void {
     const timestamp = getKSTTimestamp();
-    const cacheDuration = this.isTodayDate(key)
-      ? this.TODAY_CACHE_DURATION
-      : this.CACHE_DURATION;
 
     this.cache.set(key, {
       data,
       timestamp,
-      expiresAt: timestamp + cacheDuration
+      expiresAt: timestamp + this.CACHE_DURATION
     });
   }
 
@@ -68,13 +63,5 @@ export class MenuCache {
    */
   clear(): void {
     this.cache.clear();
-  }
-
-  /**
-   * 캐시 키가 오늘 날짜인지 확인
-   */
-  private isTodayDate(dateString: string): boolean {
-    const today = formatDate(getKSTDate());
-    return dateString === today;
   }
 }
