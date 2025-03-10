@@ -6,7 +6,8 @@ import { getKSTDate, formatDate } from '../utils/dateUtils';
 import { memoryCache } from '../utils/cache-utils';
 
 export async function getLatestMenuDocumentIds(
-  pageUrl = `${CONFIG.BASE_URL}?mid=${CONFIG.CAFETERIA_PATH}`
+  pageUrl = `${CONFIG.BASE_URL}?mid=${CONFIG.CAFETERIA_PATH}`,
+  retryCount = 3
 ): Promise<MenuPost[]> {
   const cacheKey = 'cafeteria_menu_posts';
   const cachedData = memoryCache.get<MenuPost[]>(cacheKey);
@@ -17,7 +18,7 @@ export async function getLatestMenuDocumentIds(
   }
 
   try {
-    const response = await fetchWithTimeout(pageUrl);
+    const response = await fetchWithTimeout(pageUrl, { timeout: CONFIG.TIMEOUT * 2 });
     if (!response.ok) {
       throw new Error(`Failed to fetch menu documents: ${response.status}`);
     }
@@ -46,9 +47,17 @@ export async function getLatestMenuDocumentIds(
     memoryCache.set(cacheKey, posts);
 
     return posts;
-  } catch (error) {
-    console.error('Error fetching menu documents:', error);
-    throw new Error('Failed to fetch menu documents');
+  } catch (error: unknown) {
+    console.error(`Error fetching menu documents (attempt ${4 - retryCount}):`, error);
+
+    if (retryCount > 0 && error instanceof Error && error.name === 'AbortError') {
+      console.log(`Retrying fetch for menu documents...`);
+      // Wait before retrying to avoid immediate retry
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return getLatestMenuDocumentIds(pageUrl, retryCount - 1);
+    }
+
+    throw new Error('Failed to fetch menu documents after multiple attempts');
   }
 }
 
@@ -64,7 +73,10 @@ export function findTargetPost(menuPosts: MenuPost[], dateParam: string): MenuPo
   });
 }
 
-export async function getMealData(documentId: string): Promise<{ menu: MealMenu; images: MealImages }> {
+export async function getMealData(
+  documentId: string,
+  retryCount = 3
+): Promise<{ menu: MealMenu; images: MealImages }> {
   const cacheKey = `meal_data_${documentId}`;
   const cachedData = memoryCache.get<{ menu: MealMenu; images: MealImages }>(cacheKey);
 
@@ -75,7 +87,7 @@ export async function getMealData(documentId: string): Promise<{ menu: MealMenu;
 
   try {
     const url = `${CONFIG.BASE_URL}?mid=${CONFIG.CAFETERIA_PATH}&document_srl=${documentId}`;
-    const response = await fetchWithTimeout(url);
+    const response = await fetchWithTimeout(url, { timeout: CONFIG.TIMEOUT * 2 });
     if (!response.ok) {
       throw new Error(`Failed to fetch meal data: ${response.status}`);
     }
@@ -129,8 +141,16 @@ export async function getMealData(documentId: string): Promise<{ menu: MealMenu;
     memoryCache.set(cacheKey, result);
 
     return result;
-  } catch (error) {
-    console.error('Error fetching meal data:', error);
-    throw new Error('Failed to fetch meal data');
+  } catch (error: unknown) {
+    console.error(`Error fetching meal data for document ${documentId} (attempt ${4 - retryCount}):`, error);
+
+    if (retryCount > 0 && error instanceof Error && error.name === 'AbortError') {
+      console.log(`Retrying fetch for meal data (document ${documentId})...`);
+      const waitTime = 2000 * Math.pow(2, 3 - retryCount);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      return getMealData(documentId, retryCount - 1);
+    }
+
+    throw new Error('Failed to fetch meal data after multiple attempts');
   }
 }
