@@ -58,9 +58,11 @@ jobs:
       - name: Deploy Application to Minikube
         run: |
           kubectl delete deployment/${{ env.NAME }} --ignore-not-found=true
-          kubectl create deployment ${{ env.NAME }} --image=${{ env.DOCKER_IMAGE }}:latest
-          kubectl expose deployment ${{ env.NAME }} --type=NodePort --port=3000 --name=${{ env.NAME }}-service --overwrite=true
+          kubectl delete service/${{ env.NAME }}-service --ignore-not-found=true
 
+          kubectl create deployment ${{ env.NAME }} --image=${{ env.DOCKER_IMAGE }}:latest
+          kubectl expose deployment ${{ env.NAME }} --type=NodePort --port=3000 --name=${{ env.NAME }}-service
+      
       - name: Verify Deployment
         run: |
           kubectl rollout status deployment/${{ env.NAME }}
