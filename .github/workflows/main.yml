@@ -50,17 +50,28 @@ jobs:
           minikube start --driver=docker || true
           eval $(minikube docker-env)
 
-      - name: Pull Docker Image
+      - name: Configure GHCR Credentials for Kubernetes
         run: |
-          docker login ghcr.io -u ${{ github.repository_owner }} -p ${{ secrets.GHCR_TOKEN }}
-          docker pull ${{ env.DOCKER_IMAGE }}:latest
+          kubectl delete secret ghcr-secret --ignore-not-found=true
+          kubectl create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.repository_owner }} \
+            --docker-password=${{ secrets.GHCR_TOKEN }}
 
       - name: Deploy Application to Minikube
         run: |
           kubectl delete deployment/${{ env.NAME }} --ignore-not-found=true
           kubectl delete service/${{ env.NAME }}-service --ignore-not-found=true
 
-          kubectl create deployment ${{ env.NAME }} --image=${{ env.DOCKER_IMAGE }}:latest
+          kubectl create deployment ${{ env.NAME }} \
+            --image=${{ env.DOCKER_IMAGE }}:latest \
+            --dry-run=client -o yaml > deploy.yaml
+
+          kubectl patch --local -f deploy.yaml \
+            -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}}}' \
+            -o yaml > deploy-with-secret.yaml
+
+          kubectl apply -f deploy-with-secret.yaml
           kubectl expose deployment ${{ env.NAME }} --type=NodePort --port=3000 --name=${{ env.NAME }}-service
 
       - name: Verify Deployment
