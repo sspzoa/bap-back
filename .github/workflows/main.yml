@@ -7,7 +7,7 @@ on:
 env:
   DOCKER_IMAGE: ghcr.io/${{ github.repository }}
   VERSION: ${{ github.sha }}
-  NAME: ${{ github.repository_id }}
+  NAME: app-${{ github.repository_id }}
 
 jobs:
   build:
@@ -62,7 +62,7 @@ jobs:
 
           kubectl create deployment ${{ env.NAME }} --image=${{ env.DOCKER_IMAGE }}:latest
           kubectl expose deployment ${{ env.NAME }} --type=NodePort --port=3000 --name=${{ env.NAME }}-service
-      
+
       - name: Verify Deployment
         run: |
           kubectl rollout status deployment/${{ env.NAME }}
