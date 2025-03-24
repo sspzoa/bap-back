@@ -3,14 +3,14 @@ import type {MenuPost, MealMenu, MealImages} from '../types';
 import { CONFIG } from '../config';
 import { fetchWithTimeout } from '../utils/fetchUtils';
 import { getKSTDate, formatDate } from '../utils/dateUtils';
-import { memoryCache } from '../utils/cache-utils';
+import { sqliteCache } from '../utils/sqlite-cache';
 
 export async function getLatestMenuDocumentIds(
   pageUrl = `${CONFIG.BASE_URL}?mid=${CONFIG.CAFETERIA_PATH}`,
   retryCount = 3
 ): Promise<MenuPost[]> {
   const cacheKey = 'cafeteria_menu_posts';
-  const cachedData = memoryCache.get<MenuPost[]>(cacheKey);
+  const cachedData = sqliteCache.get<MenuPost[]>(cacheKey);
 
   if (cachedData) {
     console.log('Using cached menu posts data');
@@ -44,7 +44,7 @@ export async function getLatestMenuDocumentIds(
       .get()
       .filter((post): post is MenuPost => post !== null);
 
-    memoryCache.set(cacheKey, posts);
+    sqliteCache.set(cacheKey, posts);
 
     return posts;
   } catch (error: unknown) {
@@ -78,7 +78,7 @@ export async function getMealData(
   retryCount = 3
 ): Promise<{ menu: MealMenu; images: MealImages }> {
   const cacheKey = `meal_data_${documentId}`;
-  const cachedData = memoryCache.get<{ menu: MealMenu; images: MealImages }>(cacheKey);
+  const cachedData = sqliteCache.get<{ menu: MealMenu; images: MealImages }>(cacheKey);
 
   if (cachedData) {
     console.log(`Using cached meal data for document ${documentId}`);
@@ -138,7 +138,7 @@ export async function getMealData(
 
     const result = { menu, images };
 
-    memoryCache.set(cacheKey, result);
+    sqliteCache.set(cacheKey, result);
 
     return result;
   } catch (error: unknown) {

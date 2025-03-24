@@ -1,5 +1,5 @@
 // utils/cron.ts
-import { memoryCache } from './cache-utils';
+import { sqliteCache } from './sqlite-cache';
 import { getLatestMenuDocumentIds, findTargetPost, getMealData } from '../services/cafeteriaService';
 import { formatDate } from './dateUtils';
 
@@ -7,7 +7,7 @@ async function refreshCafeteriaData() {
   console.log('Cron job: Refreshing cafeteria data...');
 
   try {
-    memoryCache.clear();
+    sqliteCache.clear();
 
     const menuPosts = await getLatestMenuDocumentIds();
     console.log(`Found ${menuPosts.length} menu posts`);
@@ -26,7 +26,7 @@ async function refreshCafeteriaData() {
         const { menu, images } = await getMealData(post.documentId);
 
         const responseData = { ...menu, images };
-        memoryCache.set(`cafeteria_${dateKey}`, responseData);
+        sqliteCache.set(`cafeteria_${dateKey}`, responseData);
 
       } catch (error) {
         console.error(`Error pre-fetching menu for post ${post.title}:`, error);
