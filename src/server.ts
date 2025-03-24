@@ -2,7 +2,7 @@ import { serve } from 'bun';
 import { handleCafeteriaRequest } from './routes/cafeteriaRoute';
 import { CONFIG } from './config';
 import { setupCronJob } from './utils/cron';
-import { memoryCache } from './utils/cache-utils';
+import { sqliteCache } from './utils/sqlite-cache';
 
 export const server = serve({
   port: CONFIG.PORT,
@@ -24,7 +24,7 @@ export const server = serve({
     }
 
     if (path === '/clear-cache' && req.method === 'POST') {
-      memoryCache.clear();
+      sqliteCache.clear();
       return new Response(JSON.stringify({ success: true, message: 'Cache cleared' }), {
         headers: {
           ...corsHeaders,
@@ -37,7 +37,7 @@ export const server = serve({
       return new Response(JSON.stringify({
         status: 'ok',
         cacheStatus: {
-          menu_posts: memoryCache.has('cafeteria_menu_posts')
+          menu_posts: sqliteCache.has('cafeteria_menu_posts')
         }
       }), {
         headers: {

@@ -1,4 +1,4 @@
-import { memoryCache } from '../utils/cache-utils';
+import { sqliteCache } from '../utils/sqlite-cache';
 import { getLatestMenuDocumentIds, findTargetPost, getMealData } from '../services/cafeteriaService';
 import { isValidDate } from '../utils/dateUtils';
 
@@ -12,7 +12,7 @@ export async function handleCafeteriaRequest(dateParam: string) {
     }
 
     const cacheKey = `cafeteria_${dateParam}`;
-    const cachedData = memoryCache.get(cacheKey);
+    const cachedData = sqliteCache.get(cacheKey);
     if (cachedData) {
       return {
         status: 200,
@@ -32,7 +32,7 @@ export async function handleCafeteriaRequest(dateParam: string) {
     const { menu, images } = await getMealData(targetPost.documentId);
     const responseData = { ...menu, images };
 
-    memoryCache.set(cacheKey, responseData);
+    sqliteCache.set(cacheKey, responseData);
 
     return {
       status: 200,
