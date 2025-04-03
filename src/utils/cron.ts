@@ -40,7 +40,7 @@ async function refreshCafeteriaData() {
   }
 }
 
-export function setupCronJob(intervalMs: number = 30 * 60 * 1000) {
+export function setupCronJob(intervalMs: number = 5 * 60 * 1000) {
   console.log(`Setting up cron job to refresh data every ${intervalMs / 60000} minutes`);
 
   refreshCafeteriaData().catch((err) => console.error('Initial data refresh failed:', err));
