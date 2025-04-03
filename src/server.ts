@@ -75,4 +75,4 @@ export const server = serve({
   },
 });
 
-setupCronJob(30 * 60 * 1000);
+setupCronJob(5 * 60 * 1000);
