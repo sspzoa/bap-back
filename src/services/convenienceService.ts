@@ -1,5 +1,4 @@
 // services/convenienceService.ts
-import { fetchWithTimeout } from '../utils/fetchUtils';
 import { sqliteCache } from '../utils/sqlite-cache';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
@@ -20,47 +19,61 @@ export interface ConvenienceMealData {
 }
 
 async function fetchWithPuppeteer(url: string, timeout = 30000): Promise<any> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu'
-    ]
-  });
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+  console.log(`Using Chrome executable path: ${executablePath || 'default'}`);
 
   try {
-    const page = await browser.newPage();
-    await page.setDefaultNavigationTimeout(timeout);
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-    await page.goto(url, { waitUntil: 'networkidle2' });
-
-    await page.waitForFunction(() => {
-      return !document.querySelector('div.main-wrapper') ||
-        document.title !== 'Just a moment...';
-    }, { timeout });
-
-    const content = await page.content();
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu',
+        '--disable-extensions'
+      ],
+      ignoreDefaultArgs: ['--disable-extensions']
+    });
 
     try {
-      const bodyText = await page.evaluate(() => document.body.innerText);
-      return JSON.parse(bodyText);
-    } catch (e) {
-      console.log('Content not JSON, extracting manually');
+      const page = await browser.newPage();
+      await page.setDefaultNavigationTimeout(timeout);
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
 
-      const jsonMatch = content.match(/{[\s\S]*}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      console.log(`Navigating to URL: ${url}`);
+      await page.goto(url, { waitUntil: 'networkidle2' });
+
+      await page.waitForFunction(() => {
+        return !document.querySelector('div.main-wrapper') ||
+          document.title !== 'Just a moment...';
+      }, { timeout });
+
+      const content = await page.content();
+
+      try {
+        const bodyText = await page.evaluate(() => document.body.innerText);
+        return JSON.parse(bodyText);
+      } catch (e) {
+        console.log('Content not JSON, extracting manually');
+
+        const jsonMatch = content.match(/{[\s\S]*}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+
+        throw new Error('Failed to extract JSON from response');
       }
-
-      throw new Error('Failed to extract JSON from response');
+    } finally {
+      await browser.close();
     }
-  } finally {
-    await browser.close();
+  } catch (error) {
+    console.error('Browser launch error details:', error);
+    throw error;
   }
 }
 
