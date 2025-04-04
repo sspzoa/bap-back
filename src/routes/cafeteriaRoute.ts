@@ -1,5 +1,6 @@
 import { sqliteCache } from '../utils/sqlite-cache';
 import { getLatestMenuDocumentIds, findTargetPost, getMealData } from '../services/cafeteriaService';
+import { getConvenienceMealData } from '../services/convenienceService';
 import { isValidDate } from '../utils/dateUtils';
 
 export async function handleCafeteriaRequest(dateParam: string) {
@@ -30,7 +31,17 @@ export async function handleCafeteriaRequest(dateParam: string) {
     }
 
     const { menu, images } = await getMealData(targetPost.documentId);
-    const responseData = { ...menu, images };
+
+    const convenienceMealData = await getConvenienceMealData(dateParam);
+
+    const responseData = {
+      ...menu,
+      images,
+      convenience: convenienceMealData ? {
+        morning: convenienceMealData.morning,
+        evening: convenienceMealData.evening
+      } : null
+    };
 
     sqliteCache.set(cacheKey, responseData);
 
