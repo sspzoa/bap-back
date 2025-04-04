@@ -83,30 +83,10 @@ async function refreshCafeteriaData() {
   }
 }
 
-function isInScheduledTimeRange(): boolean {
-  const now = new Date();
-  const hour = now.getHours();
-
-  return (hour >= 7 && hour < 8) ||
-    (hour >= 12 && hour < 13) ||
-    (hour >= 18 && hour < 19);
-}
-
 export function setupCronJob(intervalMs: number = 5 * 60 * 1000) {
-  console.log(`Setting up cron job to refresh data every ${intervalMs / 60000} minutes during scheduled hours (7-8, 12-13, 18-19)`);
+  console.log(`Setting up cron job to refresh data every ${intervalMs / 60000} minutes`);
 
-  if (isInScheduledTimeRange()) {
-    refreshCafeteriaData().catch((err) => console.error('Initial data refresh failed:', err));
-  } else {
-    console.log('Initial refresh skipped: Current time is outside scheduled hours');
-  }
+  refreshCafeteriaData().catch((err) => console.error('Initial data refresh failed:', err));
 
-  return setInterval(() => {
-    if (isInScheduledTimeRange()) {
-      console.log('Scheduled time detected, running cron job');
-      refreshCafeteriaData().catch((err) => console.error('Data refresh failed:', err));
-    } else {
-      console.log('Skipping cron job: Current time is outside scheduled hours');
-    }
-  }, intervalMs);
+  return setInterval(refreshCafeteriaData, intervalMs);
 }
