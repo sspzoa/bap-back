@@ -1,9 +1,6 @@
 // services/convenienceService.ts
 import { sqliteCache } from '../utils/sqlite-cache';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-puppeteer.use(StealthPlugin());
+import cloudscraper from 'cloudscraper';
 
 interface ConvenienceMealItem {
   sandwich: string[];
@@ -18,48 +15,30 @@ export interface ConvenienceMealData {
   evening: ConvenienceMealItem;
 }
 
-async function fetchWithPuppeteer(url: string, timeout = 30000): Promise<any> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu'
-    ]
-  });
+async function fetchWithCloudscraper(url: string, timeout = 30000): Promise<any> {
+  const options = {
+    uri: url,
+    method: 'GET',
+    timeout: timeout,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Referer': 'https://lightsail.aws.amazon.com/'
+    },
+    cloudflareTimeout: 10000,
+    cloudflareMaxTimeout: 30000,
+    followAllRedirects: true,
+    resolveWithFullResponse: false,
+    json: true
+  };
 
   try {
-    const page = await browser.newPage();
-    await page.setDefaultNavigationTimeout(timeout);
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-    await page.goto(url, { waitUntil: 'networkidle2' });
-
-    await page.waitForFunction(() => {
-      return !document.querySelector('div.main-wrapper') ||
-        document.title !== 'Just a moment...';
-    }, { timeout });
-
-    const content = await page.content();
-
-    try {
-      const bodyText = await page.evaluate(() => document.body.innerText);
-      return JSON.parse(bodyText);
-    } catch (e) {
-      console.log('Content not JSON, extracting manually');
-
-      const jsonMatch = content.match(/{[\s\S]*}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      throw new Error('Failed to extract JSON from response');
-    }
-  } finally {
-    await browser.close();
+    const response = await cloudscraper(options);
+    return response;
+  } catch (error) {
+    console.error('Cloudscraper error:', error);
+    throw error;
   }
 }
 
@@ -77,8 +56,8 @@ export async function getConvenienceMealData(
 
   try {
     const url = `https://${process.env.CONVENIENCE_API_URL}/menu?date=${dateParam}`;
-    console.log(`Fetching convenience meal data with Puppeteer for ${dateParam}`);
-    const data = await fetchWithPuppeteer(url);
+    console.log(`Fetching convenience meal data with Cloudscraper for ${dateParam}`);
+    const data = await fetchWithCloudscraper(url);
     sqliteCache.set(cacheKey, data);
     return data as ConvenienceMealData;
   } catch (error: unknown) {
