@@ -1,9 +1,6 @@
 // services/convenienceService.ts
+import { fetchWithTimeout } from '../utils/fetchUtils';
 import { sqliteCache } from '../utils/sqlite-cache';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-puppeteer.use(StealthPlugin());
 
 interface ConvenienceMealItem {
   sandwich: string[];
@@ -16,65 +13,6 @@ interface ConvenienceMealItem {
 export interface ConvenienceMealData {
   morning: ConvenienceMealItem;
   evening: ConvenienceMealItem;
-}
-
-async function fetchWithPuppeteer(url: string, timeout = 30000): Promise<any> {
-  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
-  console.log(`Using Chrome executable path: ${executablePath || 'default'}`);
-
-  try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu',
-        '--disable-extensions'
-      ],
-      ignoreDefaultArgs: ['--disable-extensions']
-    });
-
-    try {
-      const page = await browser.newPage();
-      await page.setDefaultNavigationTimeout(timeout);
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-
-      console.log(`Navigating to URL: ${url}`);
-      await page.goto(url, { waitUntil: 'networkidle2' });
-
-      await page.waitForFunction(() => {
-        return !document.querySelector('div.main-wrapper') ||
-          document.title !== 'Just a moment...';
-      }, { timeout });
-
-      const content = await page.content();
-
-      try {
-        const bodyText = await page.evaluate(() => document.body.innerText);
-        return JSON.parse(bodyText);
-      } catch (e) {
-        console.log('Content not JSON, extracting manually');
-
-        const jsonMatch = content.match(/{[\s\S]*}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-
-        throw new Error('Failed to extract JSON from response');
-      }
-    } finally {
-      await browser.close();
-    }
-  } catch (error) {
-    console.error('Browser launch error details:', error);
-    throw error;
-  }
 }
 
 export async function getConvenienceMealData(
@@ -91,16 +29,27 @@ export async function getConvenienceMealData(
 
   try {
     const url = `https://${process.env.CONVENIENCE_API_URL}/menu?date=${dateParam}`;
-    console.log(`Fetching convenience meal data with Puppeteer for ${dateParam}`);
-    const data = await fetchWithPuppeteer(url);
+    const response = await fetchWithTimeout(url, { timeout: 5000 });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log(`Convenience meal data not found for ${dateParam}`);
+        return null;
+      }
+      throw new Error(`Failed to fetch convenience meal data: ${response.status}`);
+    }
+
+    const data = await response.json() as ConvenienceMealData;
+
     sqliteCache.set(cacheKey, data);
-    return data as ConvenienceMealData;
+
+    return data;
   } catch (error: unknown) {
     console.error(`Error fetching convenience meal data for ${dateParam} (attempt ${4 - retryCount}):`, error);
 
-    if (retryCount > 0) {
+    if (retryCount > 0 && error instanceof Error && error.name === 'AbortError') {
       console.log(`Retrying fetch for convenience meal data (date ${dateParam})...`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       return getConvenienceMealData(dateParam, retryCount - 1);
     }
 
