@@ -54,27 +54,6 @@ export const server = serve({
       });
     }
 
-    if (path === '/force-refresh' && req.method === 'POST') {
-      try {
-        const { refreshCafeteriaData } = require('./utils/cron');
-        await refreshCafeteriaData();
-        return new Response(JSON.stringify({ success: true, message: 'Data refreshed successfully' }), {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        });
-      } catch (error) {
-        return new Response(JSON.stringify({ success: false, message: 'Failed to refresh data', error: String(error) }), {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        });
-      }
-    }
-
     const datePattern = /^\/(\d{4}-\d{2}-\d{2})$/;
     const dateMatch = path.match(datePattern);
 
