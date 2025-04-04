@@ -37,6 +37,8 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           tags: ${{ env.DOCKER_IMAGE }}:latest
+          build-args: |
+            NOTION_API_KEY=${{ secrets.CONVENIENCE_API_URL }}
 
   deploy:
     needs: build
@@ -55,4 +57,5 @@ jobs:
           docker rm ${{ env.NAME }} || true
           docker rmi ${{ env.DOCKER_IMAGE }}:latest || true
           docker run -d -p 3003:3000 --name ${{ env.NAME }} --restart always \
+            -e NOTION_API_KEY=${{ secrets.CONVENIENCE_API_URL }} \
             ${{ env.DOCKER_IMAGE }}:latest
