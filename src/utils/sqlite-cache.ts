@@ -1,9 +1,8 @@
-// utils/sqlite-cache.ts
 import { Database } from 'bun:sqlite';
 
 class SQLiteCache {
   private db: Database;
-  private readonly TTL: number = 24 * 60 * 60 * 1000; // TTL in milliseconds
+  private readonly TTL: number = 24 * 60 * 60 * 1000;
 
   constructor(dbPath: string = './cache.db') {
     this.db = new Database(dbPath);
@@ -12,11 +11,11 @@ class SQLiteCache {
 
   private init() {
     this.db.run(`
-      CREATE TABLE IF NOT EXISTS cache (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        timestamp INTEGER NOT NULL
-      )
+        CREATE TABLE IF NOT EXISTS cache (
+                                             key TEXT PRIMARY KEY,
+                                             value TEXT NOT NULL,
+                                             timestamp INTEGER NOT NULL
+        )
     `);
 
     setInterval(() => this.cleanup(), 60 * 60 * 1000);
@@ -77,6 +76,12 @@ class SQLiteCache {
 
   clear(): void {
     this.db.run('DELETE FROM cache');
+  }
+
+  getAllKeys(): string[] {
+    const stmt = this.db.prepare('SELECT key FROM cache');
+    const rows = stmt.all() as Array<{key: string}>;
+    return rows.map(row => row.key);
   }
 
   close(): void {

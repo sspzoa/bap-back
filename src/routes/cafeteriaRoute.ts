@@ -1,7 +1,15 @@
 import { sqliteCache } from '../utils/sqlite-cache';
 import { getLatestMenuDocumentIds, findTargetPost, getMealData } from '../services/cafeteriaService';
-import { getConvenienceMealData } from '../services/convenienceService';
+import type {getConvenienceMealData, ConvenienceMealData} from '../services/convenienceService';
 import { isValidDate } from '../utils/dateUtils';
+import type {MealImages} from '../types';
+
+interface CafeteriaMenu {
+  breakfast: string;
+  lunch: string;
+  dinner: string;
+  images: MealImages;
+}
 
 export async function handleCafeteriaRequest(dateParam: string) {
   try {
@@ -12,46 +20,71 @@ export async function handleCafeteriaRequest(dateParam: string) {
       };
     }
 
-    const cacheKey = `cafeteria_${dateParam}`;
-    const cachedData = sqliteCache.get(cacheKey);
-    if (cachedData) {
+    const cafeteriaCacheKey = `cafeteria_${dateParam}`;
+    const convenienceCacheKey = `convenience_${dateParam}`;
+    const combinedCacheKey = `combined_menu_${dateParam}`;
+
+    const cachedCombined = sqliteCache.get<CafeteriaMenu>(combinedCacheKey);
+    if (cachedCombined) {
       return {
         status: 200,
-        body: cachedData
+        body: cachedCombined
       };
     }
 
-    const menuPosts = await getLatestMenuDocumentIds();
-    const targetPost = findTargetPost(menuPosts, dateParam);
-    if (!targetPost) {
-      return {
-        status: 404,
-        body: { error: 'Menu not found for the specified date' }
+    let cafeteriaData: CafeteriaMenu;
+    const cachedCafeteria = sqliteCache.get<CafeteriaMenu>(cafeteriaCacheKey);
+
+    if (cachedCafeteria) {
+      cafeteriaData = cachedCafeteria;
+    } else {
+      const menuPosts = await getLatestMenuDocumentIds();
+      const targetPost = findTargetPost(menuPosts, dateParam);
+      if (!targetPost) {
+        return {
+          status: 404,
+          body: { error: 'Menu not found for the specified date' }
+        };
+      }
+
+      const { menu, images } = await getMealData(targetPost.documentId);
+
+      const formatMenuText = (text: string): string => {
+        return text.replace(/\//g, '\n');
       };
+
+      cafeteriaData = {
+        breakfast: menu.breakfast ? formatMenuText(menu.breakfast) : '',
+        lunch: menu.lunch ? formatMenuText(menu.lunch) : '',
+        dinner: menu.dinner ? formatMenuText(menu.dinner) : '',
+        images
+      };
+
+      sqliteCache.set(cafeteriaCacheKey, cafeteriaData);
     }
 
-    const { menu, images } = await getMealData(targetPost.documentId);
+    let convenienceData: ConvenienceMealData | null = null;
+    const cachedConvenience = sqliteCache.get<ConvenienceMealData>(convenienceCacheKey);
 
-    const convenienceMealData = await getConvenienceMealData(dateParam);
+    if (cachedConvenience) {
+      convenienceData = cachedConvenience;
+    }
 
-    const formatMenuText = (text: string): string => {
-      return text.replace(/\//g, '\n');
+    const combinedMenu: CafeteriaMenu = {
+      breakfast: cafeteriaData.breakfast || '',
+      lunch: cafeteriaData.lunch || '',
+      dinner: cafeteriaData.dinner || '',
+      images: cafeteriaData.images
     };
 
-    const combinedMenu = {
-      breakfast: menu.breakfast ? formatMenuText(menu.breakfast) : '',
-      lunch: menu.lunch ? formatMenuText(menu.lunch) : '',
-      dinner: menu.dinner ? formatMenuText(menu.dinner) : ''
-    };
-
-    if (convenienceMealData) {
-      if (convenienceMealData.morning) {
+    if (convenienceData) {
+      if (convenienceData.morning) {
         const morningItems = [
-          ...convenienceMealData.morning.sandwich.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.morning.salad.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.morning.chicken.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.morning.grain.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.morning.etc.map(item => `[간편식] ${item}`)
+          ...(convenienceData.morning.sandwich || []).map(item => `[간편식] ${item}`),
+          ...(convenienceData.morning.salad || []).map(item => `[간편식] ${item}`),
+          ...(convenienceData.morning.chicken || []).map(item => `[간편식] ${item}`),
+          ...(convenienceData.morning.grain || []).map(item => `[간편식] ${item}`),
+          ...(convenienceData.morning.etc || []).map(item => `[간편식] ${item}`)
         ].filter(Boolean);
 
         if (morningItems.length > 0) {
@@ -61,13 +94,13 @@ export async function handleCafeteriaRequest(dateParam: string) {
         }
       }
 
-      if (convenienceMealData.evening) {
+      if (convenienceData.evening) {
         const eveningItems = [
-          ...convenienceMealData.evening.sandwich.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.evening.salad.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.evening.chicken.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.evening.grain.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.evening.etc.map(item => `[간편식] ${item}`)
+          ...(convenienceData.evening.sandwich || []).map(item => `[간편식] ${item}`),
+          ...(convenienceData.evening.salad || []).map(item => `[간편식] ${item}`),
+          ...(convenienceData.evening.chicken || []).map(item => `[간편식] ${item}`),
+          ...(convenienceData.evening.grain || []).map(item => `[간편식] ${item}`),
+          ...(convenienceData.evening.etc || []).map(item => `[간편식] ${item}`)
         ].filter(Boolean);
 
         if (eveningItems.length > 0) {
@@ -78,16 +111,11 @@ export async function handleCafeteriaRequest(dateParam: string) {
       }
     }
 
-    const responseData = {
-      ...combinedMenu,
-      images
-    };
-
-    sqliteCache.set(cacheKey, responseData);
+    sqliteCache.set(combinedCacheKey, combinedMenu);
 
     return {
       status: 200,
-      body: responseData
+      body: combinedMenu
     };
   } catch (error) {
     console.error('Server error:', error);

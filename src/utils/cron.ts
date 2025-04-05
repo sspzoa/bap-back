@@ -1,14 +1,22 @@
 // utils/cron.ts
 import { sqliteCache } from './sqlite-cache';
 import { getLatestMenuDocumentIds, findTargetPost, getMealData } from '../services/cafeteriaService';
-import { getConvenienceMealData } from '../services/convenienceService';
 import { formatDate } from './dateUtils';
 
 async function refreshCafeteriaData() {
   console.log('Cron job: Refreshing cafeteria data...');
 
   try {
-    sqliteCache.clear();
+    const keys = sqliteCache.getAllKeys().filter(key =>
+      key === 'cafeteria_menu_posts' ||
+      key.startsWith('cafeteria_') ||
+      key.startsWith('meal_data_') ||
+      key.startsWith('combined_menu_')
+    );
+
+    for (const key of keys) {
+      sqliteCache.delete(key);
+    }
 
     const menuPosts = await getLatestMenuDocumentIds();
     console.log(`Found ${menuPosts.length} menu posts`);
@@ -26,46 +34,8 @@ async function refreshCafeteriaData() {
         console.log(`Pre-fetching menu data for ${dateKey} (${post.title})`);
         const { menu, images } = await getMealData(post.documentId);
 
-        const convenienceMealData = await getConvenienceMealData(dateKey);
-
-        const combinedMenu = { ...menu };
-
-        if (convenienceMealData) {
-          if (convenienceMealData.morning) {
-            const morningItems = [
-              ...(convenienceMealData.morning.sandwich || []).map(item => `[간편식] ${item}`),
-              ...(convenienceMealData.morning.salad || []).map(item => `[간편식] ${item}`),
-              ...(convenienceMealData.morning.chicken || []).map(item => `[간편식] ${item}`),
-              ...(convenienceMealData.morning.grain || []).map(item => `[간편식] ${item}`),
-              ...(convenienceMealData.morning.etc || []).map(item => `[간편식] ${item}`)
-            ].filter(Boolean);
-
-            if (morningItems.length > 0) {
-              combinedMenu.breakfast = combinedMenu.breakfast
-                ? `${combinedMenu.breakfast}/${morningItems.join('/')}`
-                : morningItems.join('/');
-            }
-          }
-
-          if (convenienceMealData.evening) {
-            const eveningItems = [
-              ...(convenienceMealData.evening.sandwich || []).map(item => `[간편식] ${item}`),
-              ...(convenienceMealData.evening.salad || []).map(item => `[간편식] ${item}`),
-              ...(convenienceMealData.evening.chicken || []).map(item => `[간편식] ${item}`),
-              ...(convenienceMealData.evening.grain || []).map(item => `[간편식] ${item}`),
-              ...(convenienceMealData.evening.etc || []).map(item => `[간편식] ${item}`)
-            ].filter(Boolean);
-
-            if (eveningItems.length > 0) {
-              combinedMenu.dinner = combinedMenu.dinner
-                ? `${combinedMenu.dinner}/${eveningItems.join('/')}`
-                : eveningItems.join('/');
-            }
-          }
-        }
-
         const responseData = {
-          ...combinedMenu,
+          ...menu,
           images
         };
 
