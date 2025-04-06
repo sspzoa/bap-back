@@ -1,3 +1,4 @@
+// services/convenienceService.ts
 import { fetchWithTimeout } from '../utils/fetchUtils';
 import { sqliteCache } from '../utils/sqlite-cache';
 
@@ -12,10 +13,6 @@ interface ConvenienceMealItem {
 export interface ConvenienceMealData {
   morning: ConvenienceMealItem;
   evening: ConvenienceMealItem;
-}
-
-export interface AllConvenienceMealData {
-  [date: string]: ConvenienceMealData;
 }
 
 export async function getConvenienceMealData(
@@ -59,58 +56,4 @@ export async function getConvenienceMealData(
     console.error('Failed to fetch convenience meal data after multiple attempts');
     return null;
   }
-}
-
-function extractDatesFromCafeteriaKeys(keys: string[]): string[] {
-  const dateRegex = /cafeteria_(\d{4}-\d{2}-\d{2})/;
-
-  return keys.reduce((dates, key) => {
-    const match = key.match(dateRegex);
-    if (match && match[1]) {
-      dates.push(match[1]);
-    }
-    return dates;
-  }, [] as string[]);
-}
-
-export async function getAllConvenienceMealData(): Promise<AllConvenienceMealData> {
-  const allDataCacheKey = 'convenience_all_data';
-  const cachedAllData = sqliteCache.get<AllConvenienceMealData>(allDataCacheKey);
-
-  if (cachedAllData) {
-    console.log('Using cached all convenience meal data');
-    return cachedAllData;
-  }
-
-  const allCacheKeys = sqliteCache.getAllKeys();
-  const availableDates = extractDatesFromCafeteriaKeys(allCacheKeys);
-
-  console.log(`Found ${availableDates.length} dates to fetch convenience data for`);
-
-  const allConvenienceData: AllConvenienceMealData = {};
-
-  for (const date of availableDates) {
-    try {
-      const cachedData = sqliteCache.get<ConvenienceMealData>(`convenience_${date}`);
-
-      if (cachedData) {
-        allConvenienceData[date] = cachedData;
-        continue;
-      }
-
-      const data = await getConvenienceMealData(date);
-
-      if (data) {
-        allConvenienceData[date] = data;
-      }
-    } catch (error) {
-      console.error(`Error fetching convenience data for ${date}:`, error);
-    }
-  }
-
-  if (Object.keys(allConvenienceData).length > 0) {
-    sqliteCache.set(allDataCacheKey, allConvenienceData);
-  }
-
-  return allConvenienceData;
 }

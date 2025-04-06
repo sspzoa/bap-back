@@ -3,7 +3,6 @@ import { handleCafeteriaRequest } from './routes/cafeteriaRoute';
 import { CONFIG } from './config';
 import { setupCronJob } from './utils/cron';
 import { sqliteCache } from './utils/sqlite-cache';
-import { getConvenienceMealData, getAllConvenienceMealData } from './services/convenienceService';
 
 export const server = serve({
   port: CONFIG.PORT,
@@ -25,37 +24,8 @@ export const server = serve({
     }
 
     if (path === '/clear-cache' && req.method === 'POST') {
-      const keys = sqliteCache.getAllKeys().filter(key =>
-        key === 'cafeteria_menu_posts' ||
-        key.startsWith('cafeteria_') ||
-        key.startsWith('meal_data_') ||
-        key.startsWith('combined_menu_')
-      );
-
-      for (const key of keys) {
-        sqliteCache.delete(key);
-      }
-
-      return new Response(JSON.stringify({ success: true, message: 'Cafeteria cache cleared' }), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      });
-    }
-
-    if (path === '/clear-convenience-cache' && req.method === 'POST') {
-      const keys = sqliteCache.getAllKeys().filter(key =>
-        key.startsWith('convenience_') ||
-        key === 'convenience_all_data' ||
-        key.startsWith('combined_menu_')
-      );
-
-      for (const key of keys) {
-        sqliteCache.delete(key);
-      }
-
-      return new Response(JSON.stringify({ success: true, message: 'Convenience cache cleared' }), {
+      sqliteCache.clear();
+      return new Response(JSON.stringify({ success: true, message: 'Cache cleared' }), {
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json',
@@ -82,83 +52,6 @@ export const server = serve({
           'Content-Type': 'application/json',
         },
       });
-    }
-
-    if (path === '/get-convenience') {
-      const keys = sqliteCache.getAllKeys().filter(key =>
-        key.startsWith('convenience_') ||
-        key === 'convenience_all_data' ||
-        key.startsWith('combined_menu_')
-      );
-
-      for (const key of keys) {
-        sqliteCache.delete(key);
-      }
-
-      const dateParam = url.searchParams.get('date');
-
-      if (!dateParam) {
-        try {
-          const allConvenienceData = await getAllConvenienceMealData();
-
-          if (Object.keys(allConvenienceData).length === 0) {
-            return new Response(JSON.stringify({ message: 'No convenience meal data available' }), {
-              status: 200,
-              headers: {
-                ...corsHeaders,
-                'Content-Type': 'application/json',
-              },
-            });
-          }
-
-          return new Response(JSON.stringify(allConvenienceData), {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          });
-        } catch (error) {
-          console.error('Error fetching all convenience data:', error);
-          return new Response(JSON.stringify({ error: 'Failed to fetch convenience meal data' }), {
-            status: 500,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          });
-        }
-      }
-
-      try {
-        const convenienceData = await getConvenienceMealData(dateParam);
-        if (!convenienceData) {
-          return new Response(JSON.stringify({ error: 'Convenience meal data not found' }), {
-            status: 404,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          });
-        }
-
-        return new Response(JSON.stringify(convenienceData), {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        });
-      } catch (error) {
-        console.error('Error fetching convenience data:', error);
-        return new Response(JSON.stringify({ error: 'Failed to fetch convenience meal data' }), {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        });
-      }
     }
 
     const datePattern = /^\/(\d{4}-\d{2}-\d{2})$/;
