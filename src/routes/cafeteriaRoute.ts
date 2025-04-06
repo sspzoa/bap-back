@@ -88,10 +88,9 @@ export async function handleCafeteriaRequest(dateParam: string) {
         ].filter(Boolean);
 
         if (morningItems.length > 0) {
-          const morningItemsStr = morningItems.join('/');
           combinedMenu.breakfast = combinedMenu.breakfast
-            ? `${combinedMenu.breakfast}/${morningItemsStr}`
-            : morningItemsStr;
+            ? `${combinedMenu.breakfast}\n${morningItems.join('\n')}`
+            : morningItems.join('\n');
         }
       }
 
@@ -105,10 +104,9 @@ export async function handleCafeteriaRequest(dateParam: string) {
         ].filter(Boolean);
 
         if (eveningItems.length > 0) {
-          const eveningItemsStr = eveningItems.join('/');
           combinedMenu.dinner = combinedMenu.dinner
-            ? `${combinedMenu.dinner}/${eveningItemsStr}`
-            : eveningItemsStr;
+            ? `${combinedMenu.dinner}\n${eveningItems.join('\n')}`
+            : eveningItems.join('\n');
         }
       }
     }
