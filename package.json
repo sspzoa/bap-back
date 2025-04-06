@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0",
-    "cloudscraper": "^4.6.0",
+    "puppeteer": "^24.6.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   },
   "scripts": {
     "start": "bun src/index.ts"
