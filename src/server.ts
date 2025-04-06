@@ -34,17 +34,10 @@ export const server = serve({
     }
 
     if (path === '/health') {
-      const today = new Date();
-      const todayFormatted = today.getFullYear() + '-' +
-        String(today.getMonth() + 1).padStart(2, '0') + '-' +
-        String(today.getDate()).padStart(2, '0');
-
       return new Response(JSON.stringify({
         status: 'ok',
         cacheStatus: {
-          menu_posts: sqliteCache.has('cafeteria_menu_posts'),
-          today_menu: sqliteCache.has(`cafeteria_${todayFormatted}`),
-          convenience_data: sqliteCache.has(`convenience_${todayFormatted}`)
+          menu_posts: sqliteCache.has('cafeteria_menu_posts')
         }
       }), {
         headers: {
@@ -60,7 +53,6 @@ export const server = serve({
     if (dateMatch) {
       const dateParam = dateMatch[1];
       const { status, body } = await handleCafeteriaRequest(dateParam);
-
       return new Response(JSON.stringify(body), {
         status,
         headers: {
