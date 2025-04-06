@@ -34,53 +34,13 @@ export async function handleCafeteriaRequest(dateParam: string) {
 
     const convenienceMealData = await getConvenienceMealData(dateParam);
 
-    const formatMenuText = (text: string): string => {
-      return text.replace(/\//g, '\n');
-    };
-
-    const combinedMenu = {
-      breakfast: menu.breakfast ? formatMenuText(menu.breakfast) : '',
-      lunch: menu.lunch ? formatMenuText(menu.lunch) : '',
-      dinner: menu.dinner ? formatMenuText(menu.dinner) : ''
-    };
-
-    if (convenienceMealData) {
-      if (convenienceMealData.morning) {
-        const morningItems = [
-          ...convenienceMealData.morning.sandwich.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.morning.salad.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.morning.chicken.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.morning.grain.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.morning.etc.map(item => `[간편식] ${item}`)
-        ].filter(Boolean);
-
-        if (morningItems.length > 0) {
-          combinedMenu.breakfast = combinedMenu.breakfast
-            ? `${combinedMenu.breakfast}\n${morningItems.join('\n')}`
-            : morningItems.join('\n');
-        }
-      }
-
-      if (convenienceMealData.evening) {
-        const eveningItems = [
-          ...convenienceMealData.evening.sandwich.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.evening.salad.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.evening.chicken.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.evening.grain.map(item => `[간편식] ${item}`),
-          ...convenienceMealData.evening.etc.map(item => `[간편식] ${item}`)
-        ].filter(Boolean);
-
-        if (eveningItems.length > 0) {
-          combinedMenu.dinner = combinedMenu.dinner
-            ? `${combinedMenu.dinner}\n${eveningItems.join('\n')}`
-            : eveningItems.join('\n');
-        }
-      }
-    }
-
     const responseData = {
-      ...combinedMenu,
-      images
+      ...menu,
+      images,
+      convenience: convenienceMealData ? {
+        morning: convenienceMealData.morning,
+        evening: convenienceMealData.evening
+      } : null
     };
 
     sqliteCache.set(cacheKey, responseData);
