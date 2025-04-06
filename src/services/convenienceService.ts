@@ -21,7 +21,7 @@ export interface ConvenienceMealData {
 
 async function fetchWithPuppeteer(url: string, timeout = 30000): Promise<any> {
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: 'new',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
