@@ -1,7 +1,6 @@
 // utils/cron.ts
 import { sqliteCache } from './sqlite-cache';
 import { getLatestMenuDocumentIds, findTargetPost, getMealData } from '../services/cafeteriaService';
-import { getConvenienceMealData } from '../services/convenienceService';
 import { formatDate } from './dateUtils';
 
 async function refreshCafeteriaData() {
@@ -26,17 +25,7 @@ async function refreshCafeteriaData() {
         console.log(`Pre-fetching menu data for ${dateKey} (${post.title})`);
         const { menu, images } = await getMealData(post.documentId);
 
-        const convenienceMealData = await getConvenienceMealData(dateKey);
-
-        const responseData = {
-          ...menu,
-          images,
-          convenience: convenienceMealData ? {
-            morning: convenienceMealData.morning,
-            evening: convenienceMealData.evening
-          } : null
-        };
-
+        const responseData = { ...menu, images };
         sqliteCache.set(`cafeteria_${dateKey}`, responseData);
 
       } catch (error) {

@@ -52,6 +52,7 @@ export async function getLatestMenuDocumentIds(
 
     if (retryCount > 0 && error instanceof Error && error.name === 'AbortError') {
       console.log(`Retrying fetch for menu documents...`);
+      // Wait before retrying to avoid immediate retry
       await new Promise(resolve => setTimeout(resolve, 2000));
       return getLatestMenuDocumentIds(pageUrl, retryCount - 1);
     }
@@ -94,6 +95,9 @@ export async function getMealData(
     const html = await response.text();
     const $ = cheerio.load(html);
 
+    // ------------------
+    // 식단 텍스트 파싱
+    // ------------------
     const contentLines = $('.xe_content')
       .text()
       .split('\n')
