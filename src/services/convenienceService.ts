@@ -1,4 +1,5 @@
 // services/convenienceService.ts
+import { fetchWithTimeout } from '../utils/fetchUtils';
 import { sqliteCache } from '../utils/sqlite-cache';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
@@ -19,61 +20,47 @@ export interface ConvenienceMealData {
 }
 
 async function fetchWithPuppeteer(url: string, timeout = 30000): Promise<any> {
-  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
-  console.log(`Using Chrome executable path: ${executablePath || 'default'}`);
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu'
+    ]
+  });
 
   try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu',
-        '--disable-extensions'
-      ],
-      ignoreDefaultArgs: ['--disable-extensions']
-    });
+    const page = await browser.newPage();
+    await page.setDefaultNavigationTimeout(timeout);
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
+    await page.goto(url, { waitUntil: 'networkidle2' });
+
+    await page.waitForFunction(() => {
+      return !document.querySelector('div.main-wrapper') ||
+        document.title !== 'Just a moment...';
+    }, { timeout });
+
+    const content = await page.content();
 
     try {
-      const page = await browser.newPage();
-      await page.setDefaultNavigationTimeout(timeout);
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      return JSON.parse(bodyText);
+    } catch (e) {
+      console.log('Content not JSON, extracting manually');
 
-      console.log(`Navigating to URL: ${url}`);
-      await page.goto(url, { waitUntil: 'networkidle2' });
-
-      await page.waitForFunction(() => {
-        return !document.querySelector('div.main-wrapper') ||
-          document.title !== 'Just a moment...';
-      }, { timeout });
-
-      const content = await page.content();
-
-      try {
-        const bodyText = await page.evaluate(() => document.body.innerText);
-        return JSON.parse(bodyText);
-      } catch (e) {
-        console.log('Content not JSON, extracting manually');
-
-        const jsonMatch = content.match(/{[\s\S]*}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-
-        throw new Error('Failed to extract JSON from response');
+      const jsonMatch = content.match(/{[\s\S]*}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
       }
-    } finally {
-      await browser.close();
+
+      throw new Error('Failed to extract JSON from response');
     }
-  } catch (error) {
-    console.error('Browser launch error details:', error);
-    throw error;
+  } finally {
+    await browser.close();
   }
 }
 
