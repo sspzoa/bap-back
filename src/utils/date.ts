@@ -1,4 +1,5 @@
-// src/utils/dateUtils.ts
+import { logger } from './logger';
+
 export function formatDate(date: Date): string {
   try {
     const yyyy = date.getFullYear();
@@ -6,12 +7,16 @@ export function formatDate(date: Date): string {
     const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   } catch (error) {
-    console.error('Error formatting date:', error);
+    logger.error('Error formatting date:', error);
     return '';
   }
 }
 
 export function isValidDate(dateString: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    return false;
+  }
+
   const date = new Date(dateString);
   return date instanceof Date && !isNaN(date.getTime());
 }
@@ -24,4 +29,13 @@ export function getKSTDate(): Date {
 
 export function getKSTTimestamp(): number {
   return getKSTDate().getTime();
+}
+
+export function parseKoreanDate(text: string): Date | null {
+  const match = text.match(/(\d+)월\s*(\d+)일/);
+  if (!match) return null;
+
+  const [, month, day] = match;
+  const currentYear = getKSTDate().getFullYear();
+  return new Date(currentYear, parseInt(month) - 1, parseInt(day));
 }

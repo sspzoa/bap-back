@@ -16,8 +16,17 @@ export interface MenuPost {
   date: string;
 }
 
-export interface CacheEntry {
-  data: any;
-  timestamp: number;
-  expiresAt: number;
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export interface CafeteriaResponse extends MealMenu {
+  images: MealImages;
+}
+
+export interface HealthResponse {
+  status: string;
+  cacheStatus: Record<string, boolean>;
 }

@@ -1,78 +1,53 @@
 import { serve } from 'bun';
-import { handleCafeteriaRequest } from './routes/cafeteriaRoute';
 import { CONFIG } from './config';
-import { setupCronJob } from './utils/cron';
-import { sqliteCache } from './utils/sqlite-cache';
+import { handleCors } from './middleware/cors';
+import { handleError, ApiError } from './middleware/error';
+import {
+  handleHealthCheck,
+  handleClearCache,
+  handleCafeteriaRequest
+} from './routes';
+import { setupRefreshJob } from './jobs/refreshCafeteria';
 
-export const server = serve({
-  port: CONFIG.PORT,
-  async fetch(req: Request) {
-    const url = new URL(req.url);
-    const path = url.pathname;
+export function createServer() {
+  setupRefreshJob(CONFIG.CRON.REFRESH_INTERVAL);
 
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    };
+  return serve({
+    port: CONFIG.SERVER.PORT,
 
-    if (req.method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders
-      });
-    }
+    async fetch(req: Request) {
+      const url = new URL(req.url);
+      const path = url.pathname;
 
-    if (path === '/clear-cache' && req.method === 'POST') {
-      sqliteCache.clear();
-      return new Response(JSON.stringify({ success: true, message: 'Cache cleared' }), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      });
-    }
+      try {
+        const corsResponse = handleCors(req);
+        if (corsResponse) return corsResponse;
 
-    if (path === '/health') {
-      return new Response(JSON.stringify({
-        status: 'ok',
-        cacheStatus: {
-          menu_posts: sqliteCache.has('cafeteria_menu_posts')
+        if (path === '/health') {
+          return await handleHealthCheck();
         }
-      }), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      });
-    }
 
-    const datePattern = /^\/(\d{4}-\d{2}-\d{2})$/;
-    const dateMatch = path.match(datePattern);
-
-    if (dateMatch) {
-      const dateParam = dateMatch[1];
-      const { status, body } = await handleCafeteriaRequest(dateParam);
-      return new Response(JSON.stringify(body), {
-        status,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
+        if (path === '/clear-cache' && req.method === 'POST') {
+          return await handleClearCache();
         }
-      });
-    }
 
-    if (path === '/') {
-      return new Response('api.밥.net', {
-        headers: corsHeaders
-      });
-    }
+        const datePattern = /^\/(\d{4}-\d{2}-\d{2})$/;
+        const dateMatch = path.match(datePattern);
 
-    return new Response('Not Found', {
-      status: 404,
-      headers: corsHeaders
-    });
-  },
-});
+        if (dateMatch) {
+          const dateParam = dateMatch[1];
+          return await handleCafeteriaRequest(dateParam);
+        }
 
-setupCronJob(5 * 60 * 1000);
+        if (path === '/') {
+          return new Response('api.밥.net');
+        }
+
+        throw new ApiError(404, 'Endpoint not found');
+
+      } catch (error) {
+        return handleError(error);
+      }
+    },
+  });
+}
