@@ -1,6 +1,5 @@
 import { corsHeaders } from './cors';
 import { logger } from '../utils/logger';
-import type { ApiResponse } from '../types';
 
 export class ApiError extends Error {
   constructor(
@@ -17,12 +16,7 @@ export function handleError(error: unknown): Response {
   logger.error('Error handling request:', error);
 
   if (error instanceof ApiError) {
-    const body: ApiResponse = {
-      success: false,
-      error: error.message
-    };
-
-    return new Response(JSON.stringify(body), {
+    return new Response(JSON.stringify({ error: error.message }), {
       status: error.status,
       headers: {
         ...corsHeaders,
@@ -31,12 +25,7 @@ export function handleError(error: unknown): Response {
     });
   }
 
-  const body: ApiResponse = {
-    success: false,
-    error: 'Internal server error'
-  };
-
-  return new Response(JSON.stringify(body), {
+  return new Response(JSON.stringify({ error: 'Internal server error' }), {
     status: 500,
     headers: {
       ...corsHeaders,

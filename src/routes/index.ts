@@ -1,13 +1,11 @@
 import { isValidDate } from '../utils/date';
-import { logger } from '../utils/logger';
 import { corsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
 import { cache } from '../utils/cache';
 import { getCafeteriaData } from '../services/cafeteria';
-import type { ApiResponse, HealthResponse, CafeteriaResponse } from '../types';
 
 export async function handleHealthCheck(): Promise<Response> {
-  const healthData: HealthResponse = {
+  const healthData = {
     status: 'ok',
     cacheStatus: {
       menu_posts: cache.has('cafeteria_menu_posts')
@@ -25,12 +23,7 @@ export async function handleHealthCheck(): Promise<Response> {
 export async function handleClearCache(): Promise<Response> {
   cache.clear();
 
-  const response: ApiResponse<{ message: string }> = {
-    success: true,
-    data: { message: 'Cache cleared successfully' }
-  };
-
-  return new Response(JSON.stringify(response), {
+  return new Response(JSON.stringify({ success: true, message: 'Cache cleared successfully' }), {
     headers: {
       ...corsHeaders,
       'Content-Type': 'application/json'
@@ -46,12 +39,7 @@ export async function handleCafeteriaRequest(dateParam: string): Promise<Respons
   try {
     const data = await getCafeteriaData(dateParam);
 
-    const response: ApiResponse<CafeteriaResponse> = {
-      success: true,
-      data
-    };
-
-    return new Response(JSON.stringify(response), {
+    return new Response(JSON.stringify(data), {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/json'
