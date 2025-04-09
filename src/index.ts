@@ -1,3 +1,9 @@
-import { server } from './server';
+import { createServer } from './server';
+import { logger } from './utils/logger';
+import { CONFIG } from './config';
 
-console.log(`Server running at http://localhost:${server.port}`);
+const server = createServer();
+
+logger.info(`Server running at http://${CONFIG.SERVER.HOST}:${CONFIG.SERVER.PORT}`);
+
+export { server };
