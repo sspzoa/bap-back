@@ -4,7 +4,14 @@ import { logger } from '../utils/logger';
 import { cache } from '../utils/cache';
 import { fetchWithRetry } from '../utils/fetch';
 import { formatDate, parseKoreanDate } from '../utils/date';
-import type { MenuPost, MealMenu, MealImages, CafeteriaResponse } from '../types';
+import type {
+  MenuPost,
+  MealMenu,
+  MealImages,
+  CafeteriaResponse,
+  ProcessedMeal,
+  ProcessedMealMenu
+} from '../types';
 
 export async function getLatestMenuPosts(): Promise<MenuPost[]> {
   const cacheKey = 'cafeteria_menu_posts';
@@ -63,10 +70,41 @@ export function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): M
   });
 }
 
-export async function getMealData(documentId: string): Promise<{ menu: MealMenu; images: MealImages }> {
+const parseMenu = (menuStr: string): string[] => {
+  return menuStr ? menuStr.split(/\/(?![^()]*\))/).map(item => item.trim()).filter(Boolean) : [];
+};
+
+const processMealItems = (items: string[], mealType: string): ProcessedMeal => {
+  const keywordList = ["샌드위치", "죽", "닭가슴살", "선식"];
+
+  const count = mealType === "아침" ? 5 : 3;
+
+  const allItemsCount = items.length;
+  const recentItems = items.slice(Math.max(0, allItemsCount - count));
+  const nonRecentItems = items.slice(0, Math.max(0, allItemsCount - count));
+
+  const simpleMeals = recentItems.filter(item =>
+    keywordList.some(keyword => item.includes(keyword)) ||
+    (item.includes("샐러드") && !item.includes("샐러드바"))
+  );
+
+  const regularRecentItems = recentItems.filter(item =>
+    !(keywordList.some(keyword => item.includes(keyword)) ||
+      (item.includes("샐러드") && !item.includes("샐러드바")))
+  );
+
+  const regularMeals = [...nonRecentItems, ...regularRecentItems];
+
+  return {
+    regular: regularMeals,
+    simple: simpleMeals
+  };
+};
+
+export async function getMealData(documentId: string): Promise<{ meals: ProcessedMealMenu; images: MealImages }> {
   const cacheKey = `meal_data_${documentId}`;
 
-  const cachedData = cache.get<{ menu: MealMenu; images: MealImages }>(cacheKey);
+  const cachedData = cache.get<{ meals: ProcessedMealMenu; images: MealImages }>(cacheKey);
   if (cachedData) {
     logger.info(`Using cached meal data for document ${documentId}`);
     return cachedData;
@@ -92,10 +130,21 @@ export async function getMealData(documentId: string): Promise<{ menu: MealMenu;
     return mealLine ? mealLine.replace(`*${prefix}:`, '').trim() : '';
   };
 
-  const menu: MealMenu = {
+  const rawMenu: MealMenu = {
     breakfast: getMealText(CONFIG.MEAL_TYPES.BREAKFAST),
     lunch: getMealText(CONFIG.MEAL_TYPES.LUNCH),
     dinner: getMealText(CONFIG.MEAL_TYPES.DINNER)
+  };
+
+  // Process the raw menu into separated regular/simple meals
+  const breakfastItems = parseMenu(rawMenu.breakfast);
+  const lunchItems = parseMenu(rawMenu.lunch);
+  const dinnerItems = parseMenu(rawMenu.dinner);
+
+  const processedMenu: ProcessedMealMenu = {
+    breakfast: processMealItems(breakfastItems, "아침"),
+    lunch: { regular: lunchItems, simple: [] }, // Lunch doesn't have simple meals according to frontend logic
+    dinner: processMealItems(dinnerItems, "저녁")
   };
 
   const images: MealImages = {
@@ -121,7 +170,7 @@ export async function getMealData(documentId: string): Promise<{ menu: MealMenu;
     }
   });
 
-  const result = { menu, images };
+  const result = { meals: processedMenu, images };
 
   cache.set(cacheKey, result);
   logger.info(`Fetched meal data for document ${documentId}`);
@@ -146,8 +195,8 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResp
     throw new Error(`Menu not found for date ${dateParam}`);
   }
 
-  const { menu, images } = await getMealData(targetPost.documentId);
-  const responseData: CafeteriaResponse = { ...menu, images };
+  const { meals, images } = await getMealData(targetPost.documentId);
+  const responseData: CafeteriaResponse = { meals, images };
 
   cache.set(cacheKey, responseData);
 
