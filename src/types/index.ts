@@ -4,6 +4,17 @@ export interface MealMenu {
   dinner: string;
 }
 
+export interface ProcessedMeal {
+  regular: string[];
+  simple: string[];
+}
+
+export interface ProcessedMealMenu {
+  breakfast: ProcessedMeal;
+  lunch: ProcessedMeal;
+  dinner: ProcessedMeal;
+}
+
 export interface MealImages {
   breakfast: string;
   lunch: string;
@@ -22,7 +33,8 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
-export interface CafeteriaResponse extends MealMenu {
+export interface CafeteriaResponse {
+  meals: ProcessedMealMenu;
   images: MealImages;
 }
 
