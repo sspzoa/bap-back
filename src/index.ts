@@ -1,6 +1,6 @@
+import { CONFIG } from './config';
 import { createServer } from './server';
 import { logger } from './utils/logger';
-import { CONFIG } from './config';
 
 const server = createServer();
 

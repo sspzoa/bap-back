@@ -1,11 +1,11 @@
-import { corsHeaders } from './cors';
 import { logger } from '../utils/logger';
+import { corsHeaders } from './cors';
 
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
-    public readonly code?: string
+    public readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -20,8 +20,8 @@ export function handleError(error: unknown): Response {
       status: error.status,
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     });
   }
 
@@ -29,7 +29,7 @@ export function handleError(error: unknown): Response {
     status: 500,
     headers: {
       ...corsHeaders,
-      'Content-Type': 'application/json'
-    }
+      'Content-Type': 'application/json',
+    },
   });
 }

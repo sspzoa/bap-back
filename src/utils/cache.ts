@@ -6,15 +6,17 @@ export class Cache {
   private db: Database;
   private readonly ttl: number;
 
-  constructor(options: {
-    dbPath?: string;
-    ttl?: number;
-    cleanupInterval?: number;
-  } = {}) {
+  constructor(
+    options: {
+      dbPath?: string;
+      ttl?: number;
+      cleanupInterval?: number;
+    } = {},
+  ) {
     const {
       dbPath = CONFIG.CACHE.DB_PATH,
       ttl = CONFIG.CACHE.TTL,
-      cleanupInterval = CONFIG.CACHE.CLEANUP_INTERVAL
+      cleanupInterval = CONFIG.CACHE.CLEANUP_INTERVAL,
     } = options;
 
     this.ttl = ttl;
@@ -47,9 +49,7 @@ export class Cache {
 
   get<T>(key: string): T | undefined {
     const now = Date.now();
-    const stmt = this.db.prepare(
-      'SELECT value, expires_at FROM cache WHERE key = ? AND expires_at > ?'
-    );
+    const stmt = this.db.prepare('SELECT value, expires_at FROM cache WHERE key = ? AND expires_at > ?');
     const row = stmt.get(key, now) as { value: string; expires_at: number } | null;
 
     if (!row) return undefined;
@@ -69,7 +69,7 @@ export class Cache {
     const expiresAt = timestamp + (customTtl || this.ttl);
 
     const stmt = this.db.prepare(
-      'INSERT OR REPLACE INTO cache (key, value, timestamp, expires_at) VALUES (?, ?, ?, ?)'
+      'INSERT OR REPLACE INTO cache (key, value, timestamp, expires_at) VALUES (?, ?, ?, ?)',
     );
     stmt.run(key, value, timestamp, expiresAt);
   }
