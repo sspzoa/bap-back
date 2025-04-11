@@ -47,8 +47,10 @@ export async function handleCafeteriaRequest(dateParam: string): Promise<Respons
     });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('not found')) {
-        throw new ApiError(404, 'Menu not found for the specified date');
+      if (error.message === 'NO_OPERATION') {
+        throw new ApiError(404, '급식 운영이 없어요');
+      } else if (error.message === 'NO_INFORMATION' || error.message.includes('not found')) {
+        throw new ApiError(404, '급식 정보가 없어요');
       }
     }
     throw error;
