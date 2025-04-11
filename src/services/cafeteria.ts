@@ -192,7 +192,24 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResp
 
   if (!targetPost) {
     logger.warn(`No menu post found for date ${dateParam}`);
-    throw new Error(`Menu not found for date ${dateParam}`);
+
+    const targetDate = new Date(dateParam);
+
+    const hasPreviousDate = menuPosts.some(post => {
+      const postDate = parseKoreanDate(post.title);
+      return postDate && postDate < targetDate;
+    });
+
+    const hasLaterDate = menuPosts.some(post => {
+      const postDate = parseKoreanDate(post.title);
+      return postDate && postDate > targetDate;
+    });
+
+    if (hasPreviousDate && hasLaterDate) {
+      throw new Error('NO_OPERATION');
+    } else {
+      throw new Error('NO_INFORMATION');
+    }
   }
 
   const { meals, images } = await getMealData(targetPost.documentId);
