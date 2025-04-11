@@ -1,6 +1,6 @@
 export const CONFIG = {
   SERVER: {
-    PORT: parseInt(process.env.PORT || '3000', 10),
+    PORT: Number.parseInt(process.env.PORT || '3000', 10),
     HOST: process.env.HOST || 'localhost',
   },
   WEBSITE: {

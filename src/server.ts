@@ -1,13 +1,9 @@
 import { serve } from 'bun';
 import { CONFIG } from './config';
-import { handleCors } from './middleware/cors';
-import { handleError, ApiError } from './middleware/error';
-import {
-  handleHealthCheck,
-  handleClearCache,
-  handleCafeteriaRequest
-} from './routes';
 import { setupRefreshJob } from './jobs/refreshCafeteria';
+import { handleCors } from './middleware/cors';
+import { ApiError, handleError } from './middleware/error';
+import { handleCafeteriaRequest, handleClearCache, handleHealthCheck } from './routes';
 
 export function createServer() {
   setupRefreshJob(CONFIG.CRON.REFRESH_INTERVAL);
@@ -44,7 +40,6 @@ export function createServer() {
         }
 
         throw new ApiError(404, 'Endpoint not found');
-
       } catch (error) {
         return handleError(error);
       }

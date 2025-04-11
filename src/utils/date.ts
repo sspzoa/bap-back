@@ -18,7 +18,7 @@ export function isValidDate(dateString: string): boolean {
   }
 
   const date = new Date(dateString);
-  return date instanceof Date && !isNaN(date.getTime());
+  return date instanceof Date && !Number.isNaN(date.getTime());
 }
 
 export function getKSTDate(): Date {
@@ -37,5 +37,5 @@ export function parseKoreanDate(text: string): Date | null {
 
   const [, month, day] = match;
   const currentYear = getKSTDate().getFullYear();
-  return new Date(currentYear, parseInt(month) - 1, parseInt(day));
+  return new Date(currentYear, Number.parseInt(month) - 1, Number.parseInt(day));
 }

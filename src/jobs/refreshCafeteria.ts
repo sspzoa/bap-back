@@ -1,7 +1,7 @@
+import { getLatestMenuPosts, getMealData } from '../services/cafeteria';
+import { cache } from '../utils/cache';
 import { formatDate, parseKoreanDate } from '../utils/date';
 import { logger } from '../utils/logger';
-import { cache } from '../utils/cache';
-import { getLatestMenuPosts, getMealData } from '../services/cafeteria';
 
 export async function refreshCafeteriaData(): Promise<void> {
   logger.info('Starting cafeteria data refresh job');
@@ -27,10 +27,8 @@ export async function refreshCafeteriaData(): Promise<void> {
 
         const responseData = { meals, images };
         cache.set(`cafeteria_${dateKey}`, responseData);
-
       } catch (error) {
         logger.error(`Error pre-fetching menu for post ${post.title}:`, error);
-        continue;
       }
     }
 
@@ -44,7 +42,7 @@ export async function refreshCafeteriaData(): Promise<void> {
 export function setupRefreshJob(intervalMs: number): NodeJS.Timeout {
   logger.info(`Setting up cafeteria data refresh job to run every ${intervalMs / 60000} minutes`);
 
-  refreshCafeteriaData().catch(error => {
+  refreshCafeteriaData().catch((error) => {
     logger.error('Initial cafeteria data refresh failed:', error);
   });
 
