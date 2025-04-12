@@ -41,46 +41,21 @@ export function parseKoreanDate(text: string, previousDates?: Date[]): Date | nu
 
   const currentDate = getKSTDate();
   const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1;
 
   let year = currentYear;
 
   if (previousDates && previousDates.length > 0) {
-    const sortedDates = [...previousDates].sort((a, b) => b.getTime() - a.getTime());
-    const latestPrevDate = sortedDates[0];
+    const latestDate = previousDates[0];
+    const latestMonth = latestDate.getMonth() + 1;
 
-    if (month < latestPrevDate.getMonth() + 1 - 2) {
-      year = latestPrevDate.getFullYear() + 1;
-    } else if (month > latestPrevDate.getMonth() + 1 + 2) {
-      year = latestPrevDate.getFullYear() - 1;
+    if (month < latestMonth && latestMonth - month > 6) {
+      year = latestDate.getFullYear() + 1;
+    } else if (month > latestMonth && month - latestMonth > 6) {
+      year = latestDate.getFullYear() - 1;
     } else {
-      year = latestPrevDate.getFullYear();
-    }
-  } else {
-    if (month < currentMonth - 1) {
-      if (currentMonth > 10) {
-        year = currentYear + 1;
-      }
-    } else if (month > currentMonth + 1) {
-      if (currentMonth < 3) {
-        year = currentYear - 1;
-      }
+      year = latestDate.getFullYear();
     }
   }
 
-  const parsedDate = new Date(year, month - 1, day);
-
-  const sixMonthsInFuture = new Date(currentDate);
-  sixMonthsInFuture.setMonth(currentDate.getMonth() + 6);
-  if (parsedDate > sixMonthsInFuture) {
-    parsedDate.setFullYear(year - 1);
-  }
-
-  const sixMonthsInPast = new Date(currentDate);
-  sixMonthsInPast.setMonth(currentDate.getMonth() - 6);
-  if (parsedDate < sixMonthsInPast) {
-    parsedDate.setFullYear(year + 1);
-  }
-
-  return parsedDate;
+  return new Date(year, month - 1, day);
 }
