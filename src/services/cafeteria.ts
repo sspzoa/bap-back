@@ -6,71 +6,50 @@ import { formatDate, parseKoreanDate } from '../utils/date';
 import { fetchWithRetry } from '../utils/fetch';
 import { logger } from '../utils/logger';
 
-export async function getLatestMenuPosts(
-  options: { startPage?: number; endPage?: number; useCache?: boolean } = {},
-): Promise<MenuPost[]> {
-  const { startPage = 1, endPage = 1, useCache = true } = options;
+export async function getLatestMenuPosts(): Promise<MenuPost[]> {
   const cacheKey = 'cafeteria_menu_posts';
 
-  if (useCache && startPage === 1 && endPage === 1) {
-    const cachedData = cache.get<MenuPost[]>(cacheKey);
-    if (cachedData) {
-      logger.info('Using cached menu posts data');
-      return cachedData;
-    }
+  const cachedData = cache.get<MenuPost[]>(cacheKey);
+  if (cachedData) {
+    logger.info('Using cached menu posts data');
+    return cachedData;
   }
 
-  let allPosts: MenuPost[] = [];
+  const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}`;
 
-  for (let page = startPage; page <= endPage; page++) {
-    logger.info(`Fetching menu posts from page ${page}`);
-    const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}&page=${page}`;
+  const html = await fetchWithRetry<string>(url, {
+    timeout: CONFIG.HTTP.TIMEOUT * 2,
+    parser: async (response) => response.text(),
+  });
 
-    const html = await fetchWithRetry<string>(url, {
-      timeout: CONFIG.HTTP.TIMEOUT * 2,
-      parser: async (response) => response.text(),
-    });
+  const $ = cheerio.load(html);
 
-    const $ = cheerio.load(html);
+  const posts = $('.scContent .scEllipsis a')
+    .map((_, element) => {
+      const link = $(element).attr('href');
+      const documentId = link?.match(/document_srl=(\d+)/)?.[1];
+      if (!documentId) return null;
 
-    const pagePosts = $('.scContent .scEllipsis a')
-      .map((_, element) => {
-        const link = $(element).attr('href');
-        const documentId = link?.match(/document_srl=(\d+)/)?.[1];
-        if (!documentId) return null;
+      const title = $(element).text().trim();
+      if (!title.includes('식단')) return null;
 
-        const title = $(element).text().trim();
-        if (!title.includes('식단')) return null;
+      return {
+        documentId,
+        title,
+        date: $(element).closest('tr').find('td:nth-child(6)').text().trim(),
+      };
+    })
+    .get()
+    .filter((post): post is MenuPost => post !== null);
 
-        return {
-          documentId,
-          title,
-          date: $(element).closest('tr').find('td:nth-child(6)').text().trim(),
-        };
-      })
-      .get()
-      .filter((post): post is MenuPost => post !== null);
-
-    allPosts = [...allPosts, ...pagePosts];
-
-    if (pagePosts.length === 0) {
-      logger.warn(`No menu posts found on page ${page}, stopping pagination`);
-      break;
-    }
-  }
-
-  allPosts = allPosts.filter((post, index, self) => index === self.findIndex((p) => p.documentId === post.documentId));
-
-  if (allPosts.length > 0) {
-    if (startPage === 1) {
-      cache.set(cacheKey, allPosts);
-    }
-    logger.info(`Found ${allPosts.length} menu posts across pages ${startPage}-${endPage}`);
+  if (posts.length > 0) {
+    cache.set(cacheKey, posts);
+    logger.info(`Found ${posts.length} menu posts`);
   } else {
     logger.warn('No menu posts found on the website');
   }
 
-  return allPosts;
+  return posts;
 }
 
 export function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost | undefined {
@@ -158,13 +137,14 @@ export async function getMealData(documentId: string): Promise<{ meals: Processe
     dinner: getMealText(CONFIG.MEAL_TYPES.DINNER),
   };
 
+  // Process the raw menu into separated regular/simple meals
   const breakfastItems = parseMenu(rawMenu.breakfast);
   const lunchItems = parseMenu(rawMenu.lunch);
   const dinnerItems = parseMenu(rawMenu.dinner);
 
   const processedMenu: ProcessedMealMenu = {
     breakfast: processMealItems(breakfastItems, '아침'),
-    lunch: { regular: lunchItems, simple: [] },
+    lunch: { regular: lunchItems, simple: [] }, // Lunch doesn't have simple meals according to frontend logic
     dinner: processMealItems(dinnerItems, '저녁'),
   };
 
