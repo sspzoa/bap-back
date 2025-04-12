@@ -62,6 +62,26 @@ export async function getLatestMenuPosts(
   allPosts = allPosts.filter((post, index, self) => index === self.findIndex((p) => p.documentId === post.documentId));
 
   if (allPosts.length > 0) {
+    const initialDates: Array<{ post: MenuPost; date: Date | null }> = allPosts.map((post) => ({
+      post,
+      date: parseKoreanDate(post.title),
+    }));
+
+    const validInitialDates = initialDates
+      .filter((item) => item.date !== null)
+      .sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+
+    if (validInitialDates.length > 0) {
+      const parsedDates: Date[] = [];
+
+      for (const item of validInitialDates) {
+        const correctedDate = parseKoreanDate(item.post.title, parsedDates);
+        if (correctedDate) {
+          parsedDates.push(correctedDate);
+        }
+      }
+    }
+
     if (startPage === 1) {
       cache.set(cacheKey, allPosts);
     }
@@ -75,9 +95,19 @@ export async function getLatestMenuPosts(
 
 export function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost | undefined {
   const targetDate = new Date(dateParam);
+  const previouslyParsedDates: Date[] = [];
+
+  for (const post of menuPosts) {
+    const date = parseKoreanDate(post.title, previouslyParsedDates);
+    if (date) {
+      previouslyParsedDates.push(date);
+    }
+  }
+
+  previouslyParsedDates.sort((a, b) => b.getTime() - a.getTime());
 
   return menuPosts.find((post) => {
-    const postDate = parseKoreanDate(post.title);
+    const postDate = parseKoreanDate(post.title, previouslyParsedDates);
     if (!postDate) return false;
 
     return formatDate(postDate) === formatDate(targetDate);
@@ -215,14 +245,24 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResp
     logger.warn(`No menu post found for date ${dateParam}`);
 
     const targetDate = new Date(dateParam);
+    const previouslyParsedDates: Date[] = [];
+
+    for (const post of menuPosts) {
+      const date = parseKoreanDate(post.title, previouslyParsedDates);
+      if (date) {
+        previouslyParsedDates.push(date);
+      }
+    }
+
+    previouslyParsedDates.sort((a, b) => b.getTime() - a.getTime());
 
     const hasPreviousDate = menuPosts.some((post) => {
-      const postDate = parseKoreanDate(post.title);
+      const postDate = parseKoreanDate(post.title, previouslyParsedDates);
       return postDate && postDate < targetDate;
     });
 
     const hasLaterDate = menuPosts.some((post) => {
-      const postDate = parseKoreanDate(post.title);
+      const postDate = parseKoreanDate(post.title, previouslyParsedDates);
       return postDate && postDate > targetDate;
     });
 
