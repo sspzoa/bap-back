@@ -1,6 +1,6 @@
 import { getLatestMenuPosts, getMealData } from '../services/cafeteria';
 import { cache } from '../utils/cache';
-import { formatDate } from '../utils/date';
+import { formatDate, parseKoreanDate } from '../utils/date';
 import { logger } from '../utils/logger';
 
 export async function refreshCafeteriaData(): Promise<void> {
@@ -24,19 +24,18 @@ export async function refreshCafeteriaData(): Promise<void> {
 
     for (const post of menuPosts) {
       try {
-        const postWithDate = post as any;
-        if (!postWithDate.parsedDate) {
-          logger.warn(`Unable to determine valid date for post: ${post.title}`);
+        const postDate = parseKoreanDate(post.title);
+        if (!postDate) {
+          logger.warn(`Unable to parse date from post title: ${post.title}`);
           continue;
         }
 
-        const dateKey = formatDate(postWithDate.parsedDate);
+        const dateKey = formatDate(postDate);
         const cafeteriaKey = `cafeteria_${dateKey}`;
-
-        logger.info(`Processing menu data for ${dateKey} (${post.title})`);
 
         const existingData = cache.get(cafeteriaKey);
 
+        logger.info(`Processing menu data for ${dateKey} (${post.title})`);
         const { meals, images } = await getMealData(post.documentId);
         const newData = { meals, images };
 
