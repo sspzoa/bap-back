@@ -72,36 +72,6 @@ const parseMenu = (menuStr: string): string[] => {
     : [];
 };
 
-const processMealItems = (items: string[], mealType: string): ProcessedMeal => {
-  const keywordList = ['샌드위치', '죽', '닭가슴살', '선식'];
-
-  const count = mealType === '아침' ? 5 : 3;
-
-  const allItemsCount = items.length;
-  const recentItems = items.slice(Math.max(0, allItemsCount - count));
-  const nonRecentItems = items.slice(0, Math.max(0, allItemsCount - count));
-
-  const simpleMeals = recentItems.filter(
-    (item) =>
-      keywordList.some((keyword) => item.includes(keyword)) || (item.includes('샐러드') && !item.includes('샐러드바')),
-  );
-
-  const regularRecentItems = recentItems.filter(
-    (item) =>
-      !(
-        keywordList.some((keyword) => item.includes(keyword)) ||
-        (item.includes('샐러드') && !item.includes('샐러드바'))
-      ),
-  );
-
-  const regularMeals = [...nonRecentItems, ...regularRecentItems];
-
-  return {
-    regular: regularMeals,
-    simple: simpleMeals,
-  };
-};
-
 export async function getMealData(documentId: string): Promise<{ meals: ProcessedMealMenu; images: MealImages }> {
   const cacheKey = `meal_data_${documentId}`;
 
@@ -126,27 +96,72 @@ export async function getMealData(documentId: string): Promise<{ meals: Processe
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const getMealText = (prefix: string): string => {
-    const mealLine = contentLines.find((line) => line.startsWith(`*${prefix}:`));
-    return mealLine ? mealLine.replace(`*${prefix}:`, '').trim() : '';
-  };
-
-  const rawMenu: MealMenu = {
-    breakfast: getMealText(CONFIG.MEAL_TYPES.BREAKFAST),
-    lunch: getMealText(CONFIG.MEAL_TYPES.LUNCH),
-    dinner: getMealText(CONFIG.MEAL_TYPES.DINNER),
-  };
-
-  // Process the raw menu into separated regular/simple meals
-  const breakfastItems = parseMenu(rawMenu.breakfast);
-  const lunchItems = parseMenu(rawMenu.lunch);
-  const dinnerItems = parseMenu(rawMenu.dinner);
-
   const processedMenu: ProcessedMealMenu = {
-    breakfast: processMealItems(breakfastItems, '아침'),
-    lunch: { regular: lunchItems, simple: [] }, // Lunch doesn't have simple meals according to frontend logic
-    dinner: processMealItems(dinnerItems, '저녁'),
+    breakfast: { regular: [], simple: [] },
+    lunch: { regular: [], simple: [] },
+    dinner: { regular: [], simple: [] },
   };
+
+  let currentMealType: 'breakfast' | 'lunch' | 'dinner' | null = null;
+
+  for (let i = 0; i < contentLines.length; i++) {
+    const line = contentLines[i];
+
+    if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
+      currentMealType = 'breakfast';
+      const mealText = line.replace(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`, '').trim();
+
+      const simpleMealIndex = mealText.indexOf('<간편식>');
+      if (simpleMealIndex !== -1) {
+        const regularText = mealText.substring(0, simpleMealIndex).trim();
+        const simpleText = mealText.substring(simpleMealIndex + 5).trim();
+
+        processedMenu.breakfast.regular = parseMenu(regularText);
+        processedMenu.breakfast.simple = parseMenu(simpleText);
+      } else {
+        processedMenu.breakfast.regular = parseMenu(mealText);
+      }
+    } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
+      currentMealType = 'lunch';
+      const mealText = line.replace(`*${CONFIG.MEAL_TYPES.LUNCH}:`, '').trim();
+
+      const simpleMealIndex = mealText.indexOf('<간편식>');
+      if (simpleMealIndex !== -1) {
+        const regularText = mealText.substring(0, simpleMealIndex).trim();
+        const simpleText = mealText.substring(simpleMealIndex + 5).trim();
+
+        processedMenu.lunch.regular = parseMenu(regularText);
+        processedMenu.lunch.simple = parseMenu(simpleText);
+      } else {
+        processedMenu.lunch.regular = parseMenu(mealText);
+      }
+    } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)) {
+      currentMealType = 'dinner';
+      const mealText = line.replace(`*${CONFIG.MEAL_TYPES.DINNER}:`, '').trim();
+
+      const simpleMealIndex = mealText.indexOf('<간편식>');
+      if (simpleMealIndex !== -1) {
+        const regularText = mealText.substring(0, simpleMealIndex).trim();
+        const simpleText = mealText.substring(simpleMealIndex + 5).trim();
+
+        processedMenu.dinner.regular = parseMenu(regularText);
+        processedMenu.dinner.simple = parseMenu(simpleText);
+      } else {
+        processedMenu.dinner.regular = parseMenu(mealText);
+      }
+    } else if (line.startsWith('<간편식>') && currentMealType) {
+      const simpleText = line.replace('<간편식>', '').trim();
+      const simpleItems = parseMenu(simpleText);
+
+      if (currentMealType === 'breakfast') {
+        processedMenu.breakfast.simple = simpleItems;
+      } else if (currentMealType === 'lunch') {
+        processedMenu.lunch.simple = simpleItems;
+      } else if (currentMealType === 'dinner') {
+        processedMenu.dinner.simple = simpleItems;
+      }
+    }
+  }
 
   const images: MealImages = {
     breakfast: '',
