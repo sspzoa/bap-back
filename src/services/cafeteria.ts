@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { CONFIG } from '../config';
-import type { CafeteriaResponse, MealImages, MealMenu, MenuPost, ProcessedMeal, ProcessedMealMenu } from '../types';
+import type { CafeteriaResponse, MenuPost, ProcessedMealMenu } from '../types';
 import { cache } from '../utils/cache';
 import { formatDate, parseKoreanDate } from '../utils/date';
 import { fetchWithRetry } from '../utils/fetch';
@@ -72,10 +72,10 @@ const parseMenu = (menuStr: string): string[] => {
     : [];
 };
 
-export async function getMealData(documentId: string): Promise<{ meals: ProcessedMealMenu; images: MealImages }> {
+export async function getMealData(documentId: string): Promise<CafeteriaResponse> {
   const cacheKey = `meal_data_${documentId}`;
 
-  const cachedData = cache.get<{ meals: ProcessedMealMenu; images: MealImages }>(cacheKey);
+  const cachedData = cache.get<CafeteriaResponse>(cacheKey);
   if (cachedData) {
     logger.info(`Using cached meal data for document ${documentId}`);
     return cachedData;
@@ -97,9 +97,9 @@ export async function getMealData(documentId: string): Promise<{ meals: Processe
     .filter(Boolean);
 
   const processedMenu: ProcessedMealMenu = {
-    breakfast: { regular: [], simple: [] },
-    lunch: { regular: [], simple: [] },
-    dinner: { regular: [], simple: [] },
+    breakfast: { regular: [], simple: [], image: '' },
+    lunch: { regular: [], simple: [], image: '' },
+    dinner: { regular: [], simple: [], image: '' },
   };
 
   let currentMealType: 'breakfast' | 'lunch' | 'dinner' | null = null;
@@ -163,12 +163,7 @@ export async function getMealData(documentId: string): Promise<{ meals: Processe
     }
   }
 
-  const images: MealImages = {
-    breakfast: '',
-    lunch: '',
-    dinner: '',
-  };
-
+  // Process images directly into each meal object
   $('.xe_content img').each((_, element) => {
     const imgSrc = $(element).attr('src');
     const imgAlt = $(element).attr('alt')?.toLowerCase() || '';
@@ -177,16 +172,21 @@ export async function getMealData(documentId: string): Promise<{ meals: Processe
       const fullUrl = new URL(imgSrc, 'https://www.dimigo.hs.kr').toString();
 
       if (imgAlt.includes('조')) {
-        images.breakfast = fullUrl;
+        processedMenu.breakfast.image = fullUrl;
       } else if (imgAlt.includes('중')) {
-        images.lunch = fullUrl;
+        processedMenu.lunch.image = fullUrl;
       } else if (imgAlt.includes('석')) {
-        images.dinner = fullUrl;
+        processedMenu.dinner.image = fullUrl;
       }
     }
   });
 
-  const result = { meals: processedMenu, images };
+  // Create response with the new structure
+  const result: CafeteriaResponse = {
+    breakfast: processedMenu.breakfast,
+    lunch: processedMenu.lunch,
+    dinner: processedMenu.dinner,
+  };
 
   cache.set(cacheKey, result);
   logger.info(`Fetched meal data for document ${documentId}`);
@@ -227,10 +227,10 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResp
     throw new Error('NO_INFORMATION');
   }
 
-  const { meals, images } = await getMealData(targetPost.documentId);
-  const responseData: CafeteriaResponse = { meals, images };
+  // Get meal data directly in the new structure
+  const mealData = await getMealData(targetPost.documentId);
 
-  cache.set(cacheKey, responseData);
+  cache.set(cacheKey, mealData);
 
-  return responseData;
+  return mealData;
 }

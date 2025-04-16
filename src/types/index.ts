@@ -1,12 +1,13 @@
-export interface MealMenu {
-  breakfast: string;
-  lunch: string;
-  dinner: string;
+export interface MenuPost {
+  documentId: string;
+  title: string;
+  date: string;
 }
 
 export interface ProcessedMeal {
   regular: string[];
   simple: string[];
+  image: string;
 }
 
 export interface ProcessedMealMenu {
@@ -15,27 +16,10 @@ export interface ProcessedMealMenu {
   dinner: ProcessedMeal;
 }
 
-export interface MealImages {
-  breakfast: string;
-  lunch: string;
-  dinner: string;
-}
-
-export interface MenuPost {
-  documentId: string;
-  title: string;
-  date: string;
-}
-
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
 export interface CafeteriaResponse {
-  meals: ProcessedMealMenu;
-  images: MealImages;
+  breakfast: ProcessedMeal;
+  lunch: ProcessedMeal;
+  dinner: ProcessedMeal;
 }
 
 export interface HealthResponse {

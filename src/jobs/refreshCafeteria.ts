@@ -23,10 +23,8 @@ export async function refreshCafeteriaData(): Promise<void> {
         const dateKey = formatDate(postDate);
         logger.info(`Pre-fetching menu data for ${dateKey} (${post.title})`);
 
-        const { meals, images } = await getMealData(post.documentId);
-
-        const responseData = { meals, images };
-        cache.set(`cafeteria_${dateKey}`, responseData);
+        const mealData = await getMealData(post.documentId);
+        cache.set(`cafeteria_${dateKey}`, mealData);
       } catch (error) {
         logger.error(`Error pre-fetching menu for post ${post.title}:`, error);
       }
