@@ -6,7 +6,7 @@ import { ApiError, handleError } from './middleware/error';
 import { handleCafeteriaRequest, handleClearCache, handleHealthCheck } from './routes';
 
 export function createServer() {
-  setupRefreshJob(CONFIG.CRON.REFRESH_INTERVAL);
+  setupRefreshJob();
 
   return serve({
     port: CONFIG.SERVER.PORT,
