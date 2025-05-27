@@ -1,6 +1,6 @@
 import { getLatestMenuPosts, getMealData } from '../services/cafeteria';
 import { cache } from '../utils/cache';
-import { formatDate, getKSTDate, parseKoreanDate } from '../utils/date';
+import { formatDate, parseKoreanDate } from '../utils/date';
 import { logger } from '../utils/logger';
 
 export async function refreshCafeteriaData(): Promise<void> {
@@ -37,59 +37,12 @@ export async function refreshCafeteriaData(): Promise<void> {
   }
 }
 
-function getNextScheduleTime(): Date {
-  const now = getKSTDate();
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
-  const seconds = now.getSeconds();
-  const milliseconds = now.getMilliseconds();
-
-  const targetHours = [6, 12, 18];
-
-  const nextHour = targetHours.find((h) => h > hours);
-
-  if (!nextHour) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(6, 0, 0, 0);
-    return tomorrow;
-  }
-
-  const nextRunTime = new Date(now);
-  nextRunTime.setHours(nextHour, 0, 0, 0);
-
-  return nextRunTime;
-}
-
-function getMillisecondsUntilNextRun(): number {
-  const nextRunTime = getNextScheduleTime();
-  const now = getKSTDate();
-
-  return nextRunTime.getTime() - now.getTime();
-}
-
-export function setupRefreshJob(): NodeJS.Timeout {
-  logger.info('Setting up cafeteria data refresh job to run at 6:00, 12:00, and 18:00 KST');
+export function setupRefreshJob(intervalMs: number): NodeJS.Timeout {
+  logger.info(`Setting up cafeteria data refresh job to run every ${intervalMs / 60000} minutes`);
 
   refreshCafeteriaData().catch((error) => {
     logger.error('Initial cafeteria data refresh failed:', error);
   });
 
-  const msUntilNextRun = getMillisecondsUntilNextRun();
-  const nextRunTime = new Date(getKSTDate().getTime() + msUntilNextRun);
-
-  logger.info(`Next cafeteria data refresh scheduled at ${nextRunTime.toISOString()}`);
-
-  return <NodeJS.Timeout>setTimeout(function runScheduledJob() {
-    refreshCafeteriaData().catch((error) => {
-      logger.error('Scheduled cafeteria data refresh failed:', error);
-    });
-
-    const nextMs = getMillisecondsUntilNextRun();
-    const nextTime = new Date(getKSTDate().getTime() + nextMs);
-
-    logger.info(`Next cafeteria data refresh scheduled at ${nextTime.toISOString()}`);
-
-    setTimeout(runScheduledJob, nextMs);
-  }, msUntilNextRun);
+  return <NodeJS.Timeout>setInterval(refreshCafeteriaData, intervalMs);
 }

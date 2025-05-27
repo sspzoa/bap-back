@@ -24,4 +24,7 @@ export const CONFIG = {
       BASE_DELAY: 2000,
     },
   },
+  CRON: {
+    REFRESH_INTERVAL: 5 * 60 * 1000,
+  },
 } as const;
