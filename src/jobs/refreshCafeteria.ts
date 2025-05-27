@@ -44,7 +44,7 @@ function getNextScheduleTime(): Date {
   const seconds = now.getSeconds();
   const milliseconds = now.getMilliseconds();
 
-  const targetHours = [7, 12, 18];
+  const targetHours = [6, 12, 18];
 
   const nextHour = targetHours.find((h) => h > hours);
 
