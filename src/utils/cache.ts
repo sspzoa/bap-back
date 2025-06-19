@@ -28,12 +28,12 @@ export class Cache {
 
   private initialize(): void {
     this.db.run(`
-      CREATE TABLE IF NOT EXISTS cache (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL
-      )
+        CREATE TABLE IF NOT EXISTS cache (
+                                             key TEXT PRIMARY KEY,
+                                             value TEXT NOT NULL,
+                                             timestamp INTEGER NOT NULL,
+                                             expires_at INTEGER NOT NULL
+        )
     `);
 
     logger.info('Cache initialized');
@@ -89,6 +89,13 @@ export class Cache {
   clear(): void {
     const result = this.db.run('DELETE FROM cache');
     logger.info(`Cleared ${result.changes} cache entries`);
+  }
+
+  count(): number {
+    const now = Date.now();
+    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM cache WHERE expires_at > ?');
+    const result = stmt.get(now) as { count: number };
+    return result.count;
   }
 
   close(): void {
