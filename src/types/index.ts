@@ -1,19 +1,6 @@
-export interface MenuPost {
-  documentId: string;
-  title: string;
-  date: string;
-}
-
 export interface ProcessedMeal {
   regular: string[];
   simple: string[];
-  image: string;
-}
-
-export interface ProcessedMealMenu {
-  breakfast: ProcessedMeal;
-  lunch: ProcessedMeal;
-  dinner: ProcessedMeal;
 }
 
 export interface CafeteriaResponse {
@@ -24,5 +11,7 @@ export interface CafeteriaResponse {
 
 export interface HealthResponse {
   status: string;
-  cacheStatus: Record<string, boolean>;
+  cacheStatus: {
+    entries: number;
+  };
 }
