@@ -1,16 +1,13 @@
 import { serve } from 'bun';
 import { CONFIG } from './config';
+import { setupRefreshJob } from './jobs/refreshCafeteria';
 import { handleCors } from './middleware/cors';
 import { ApiError, handleError } from './middleware/error';
-import {
-  handleCafeteriaRequest,
-  handleCafeteriaCreate,
-  handleCafeteriaDelete,
-  handleClearCache,
-  handleHealthCheck
-} from './routes';
+import { handleCafeteriaRequest, handleClearCache, handleHealthCheck } from './routes';
 
 export function createServer() {
+  setupRefreshJob(CONFIG.CRON.REFRESH_INTERVAL);
+
   return serve({
     port: CONFIG.SERVER.PORT,
 
@@ -35,17 +32,7 @@ export function createServer() {
 
         if (dateMatch) {
           const dateParam = dateMatch[1];
-
-          switch (req.method) {
-            case 'GET':
-              return await handleCafeteriaRequest(dateParam);
-            case 'POST':
-              return await handleCafeteriaCreate(dateParam, req);
-            case 'DELETE':
-              return await handleCafeteriaDelete(dateParam);
-            default:
-              throw new ApiError(405, 'Method not allowed');
-          }
+          return await handleCafeteriaRequest(dateParam);
         }
 
         if (path === '/') {
