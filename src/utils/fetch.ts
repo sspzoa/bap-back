@@ -52,7 +52,7 @@ export async function fetchWithTimeout(
 
     const cdpSession = await createPuppeteerCDPSession(page);
 
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 10000 });
+    await page.goto(url, { waitUntil: 'networkidle2' });
 
     if (solveCaptcha) {
       try {
@@ -65,7 +65,7 @@ export async function fetchWithTimeout(
         await cdpSession.waitCaptchaSolved();
         logger.info('캡챠가 해결되었습니다.');
 
-        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
+        await page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {});
       } catch (error) {
         logger.info('캡챠가 감지되지 않았거나 이미 해결되었습니다.');
       }
