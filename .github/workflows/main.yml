@@ -37,16 +37,15 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           tags: ${{ env.DOCKER_IMAGE }}:latest
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
+          build-args: |
+            SCRAPELESS_API_KEY=${{ secrets.SCRAPELESS_API_KEY }}
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
+            MONGODB_DB_NAME=${{ secrets.MONGODB_DB_NAME }}
 
   deploy:
     needs: build
     name: Deploy
     runs-on: [ self-hosted, label-go ]
-    env:
-      DOCKER_IMAGE: ghcr.io/${{ github.repository }}
-      NAME: ${{ github.repository_id }}
     steps:
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -55,21 +54,8 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
       - name: Docker Run
-        env:
-          CONTAINER_NAME: ${{ env.NAME }}
-          IMAGE: ${{ env.DOCKER_IMAGE }}:latest
-          SCRAPELESS_KEY: ${{ secrets.SCRAPELESS_API_KEY }}
-          MONGO_URI: ${{ secrets.MONGODB_URI }}
-          MONGO_DB: ${{ secrets.MONGODB_DB_NAME }}
         run: |
-          docker stop "${CONTAINER_NAME}" || true
-          docker rm "${CONTAINER_NAME}" || true
-          docker rmi "${IMAGE}" || true
-          docker run -d \
-            -p 3002:3000 \
-            --name "${CONTAINER_NAME}" \
-            --restart always \
-            -e SCRAPELESS_API_KEY="${SCRAPELESS_KEY}" \
-            -e MONGODB_URI="${MONGO_URI}" \
-            -e MONGODB_DB_NAME="${MONGO_DB}" \
-            "${IMAGE}"
+          docker stop ${{ env.NAME }} || true
+          docker rm ${{ env.NAME }} || true
+          docker rmi ${{ env.DOCKER_IMAGE }}:latest || true
+          docker run -d -p 3002:3000 --name ${{ env.NAME }} --restart always -e SCRAPELESS_API_KEY=${{ secrets.SCRAPELESS_API_KEY }} -e MONGODB_URI=${{ secrets.MONGODB_URI }} -e MONGODB_DB_NAME=${{ secrets.MONGODB_DB_NAME }} ${{ env.DOCKER_IMAGE }}:latest
