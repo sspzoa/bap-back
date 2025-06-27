@@ -185,8 +185,10 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResp
   throw new Error('NO_INFORMATION');
 }
 
-export async function fetchAndSaveCafeteriaData(dateParam: string): Promise<CafeteriaResponse> {
-  const menuPosts = await getLatestMenuPosts();
+export async function fetchAndSaveCafeteriaData(
+  dateParam: string,
+  menuPosts: MenuPost[]
+): Promise<CafeteriaResponse> {
   const targetPost = findMenuPostForDate(menuPosts, dateParam);
 
   if (!targetPost) {

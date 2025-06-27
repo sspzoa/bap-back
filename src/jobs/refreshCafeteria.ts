@@ -21,7 +21,7 @@ export async function refreshCafeteriaData(): Promise<void> {
         const dateKey = formatDate(postDate);
 
         logger.info(`Fetching menu data for ${dateKey} (${post.title})`);
-        await fetchAndSaveCafeteriaData(dateKey);
+        await fetchAndSaveCafeteriaData(dateKey, menuPosts);
         logger.info(`Successfully saved menu data for ${dateKey}`);
       } catch (error) {
         logger.error(`Error fetching menu for post ${post.title}:`, error);
