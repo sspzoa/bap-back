@@ -74,22 +74,26 @@ export async function fetchWithTimeout(
     const content = await page.content();
     const status = 200;
 
-    const response = new Response(content, {
-      status: status,
+    return {
+      ok: true,
+      status,
       statusText: 'OK',
-      headers: new Headers({
-        'content-type': 'text/html; charset=utf-8'
-      })
-    });
-
-    Object.defineProperty(response, 'url', {
-      value: url,
-      writable: false,
-      enumerable: true,
-      configurable: true
-    });
-
-    return response;
+      headers: new Headers(),
+      url,
+      json: async () => {
+        try {
+          return JSON.parse(content);
+        } catch {
+          throw new Error('Response is not valid JSON');
+        }
+      },
+      text: async () => content,
+      blob: async () => new Blob([content]),
+      arrayBuffer: async () => new TextEncoder().encode(content).buffer,
+      clone: function () {
+        return { ...this };
+      },
+    } as Response;
   } catch (error) {
     throw new HttpError(
       500,
