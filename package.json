@@ -12,6 +12,7 @@
   "dependencies": {
     "@scrapeless-ai/sdk": "^1.5.1",
     "cheerio": "^1.0.0",
+    "mongodb": "^6.17.0",
     "puppeteer-core": "^24.10.2"
   },
   "scripts": {

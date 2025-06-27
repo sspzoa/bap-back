@@ -1,14 +1,18 @@
 import { corsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
 import { getCafeteriaData } from '../services/cafeteria';
-import { cache } from '../utils/cache';
+import { mongoDB } from '../utils/mongodb';
 import { isValidDate } from '../utils/date';
 
 export async function handleHealthCheck(): Promise<Response> {
+  const stats = await mongoDB.getStats();
+
   const healthData = {
     status: 'ok',
-    cacheStatus: {
-      menu_posts: cache.has('cafeteria_menu_posts'),
+    database: {
+      connected: true,
+      totalMealData: stats.totalMealData,
+      lastUpdated: stats.lastUpdated,
     },
   };
 
@@ -21,9 +25,13 @@ export async function handleHealthCheck(): Promise<Response> {
 }
 
 export async function handleClearCache(): Promise<Response> {
-  cache.clear();
+  const stats = await mongoDB.getStats();
 
-  return new Response(JSON.stringify({ success: true, message: 'Cache cleared successfully' }), {
+  return new Response(JSON.stringify({
+    success: true,
+    message: 'MongoDB storage is persistent. No cache to clear.',
+    stats
+  }), {
     headers: {
       ...corsHeaders,
       'Content-Type': 'application/json',
