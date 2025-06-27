@@ -55,10 +55,22 @@ function getNextRunTime(): number {
   const now = getKSTDate();
   const next = new Date(now);
 
-  next.setHours(3, 0, 0, 0);
+  const targetDay = 6;
+  const targetHour = 3;
 
-  if (now >= next) {
-    next.setDate(next.getDate() + 1);
+  next.setHours(targetHour, 0, 0, 0);
+
+  const currentDay = now.getDay();
+  const daysUntilSaturday = (targetDay - currentDay + 7) % 7;
+
+  if (currentDay === targetDay && now.getHours() < targetHour) {
+
+  } else {
+    if (daysUntilSaturday === 0) {
+      next.setDate(next.getDate() + 7);
+    } else {
+      next.setDate(next.getDate() + daysUntilSaturday);
+    }
   }
 
   return next.getTime() - now.getTime();
@@ -85,7 +97,7 @@ function scheduleNextRun(): NodeJS.Timeout {
 }
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
-  logger.info('Setting up cafeteria data refresh job to run daily at 3:00 AM');
+  logger.info('Setting up cafeteria data refresh job to run weekly on Saturday at 3:00 AM KST');
 
   refreshCafeteriaData().catch((error) => {
     logger.error('Initial cafeteria data refresh failed:', error);
