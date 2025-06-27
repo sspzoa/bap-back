@@ -34,7 +34,12 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
     .get()
     .filter((post): post is MenuPost => post !== null);
 
-  logger.info(`메뉴 게시글 ${posts.length}개 발견`, { module: 'cafeteria' });
+  if (posts.length > 0) {
+    logger.info(`Found ${posts.length} menu posts`);
+  } else {
+    logger.warn('No menu posts found on the website');
+  }
+
   return posts;
 }
 
@@ -52,9 +57,9 @@ export function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): M
 const parseMenu = (menuStr: string): string[] => {
   return menuStr
     ? menuStr
-        .split(/\/(?![^()]*\))/)
-        .map((item) => item.trim())
-        .filter(Boolean)
+      .split(/\/(?![^()]*\))/)
+      .map((item) => item.trim())
+      .filter(Boolean)
     : [];
 };
 
@@ -164,7 +169,7 @@ export async function getMealData(documentId: string, dateKey: string): Promise<
   };
 
   await mongoDB.saveMealData(dateKey, result, documentId);
-  logger.info('식단 데이터 저장 완료', { module: 'cafeteria', date: dateKey, documentId });
+  logger.info(`Fetched and saved meal data for document ${documentId}, date ${dateKey}`);
 
   return result;
 }
@@ -172,19 +177,22 @@ export async function getMealData(documentId: string, dateKey: string): Promise<
 export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResponse> {
   const cachedData = await mongoDB.getMealData(dateParam);
   if (cachedData) {
-    logger.debug('캐시된 데이터 사용', { module: 'cafeteria', date: dateParam });
+    logger.info(`Using cached cafeteria data from MongoDB for date ${dateParam}`);
     return cachedData;
   }
 
-  logger.warn('식단 데이터 없음', { module: 'cafeteria', date: dateParam });
+  logger.warn(`No menu data found for date ${dateParam}`);
   throw new Error('NO_INFORMATION');
 }
 
-export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: MenuPost[]): Promise<CafeteriaResponse> {
+export async function fetchAndSaveCafeteriaData(
+  dateParam: string,
+  menuPosts: MenuPost[]
+): Promise<CafeteriaResponse> {
   const targetPost = findMenuPostForDate(menuPosts, dateParam);
 
   if (!targetPost) {
-    logger.warn('해당 날짜의 게시글 없음', { module: 'cafeteria', date: dateParam });
+    logger.warn(`No menu post found for date ${dateParam}`);
 
     const targetDate = new Date(dateParam);
 
