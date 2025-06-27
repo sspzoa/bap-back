@@ -55,7 +55,7 @@ function getNextRunTime(): number {
   const now = new Date();
   const next = new Date();
 
-  next.setHours(18, 0, 0, 0);
+  next.setHours(3, 0, 0, 0);
 
   if (now >= next) {
     next.setDate(next.getDate() + 1);
