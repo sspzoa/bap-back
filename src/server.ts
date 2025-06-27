@@ -4,8 +4,8 @@ import { setupRefreshJob } from './jobs/refreshCafeteria';
 import { handleCors } from './middleware/cors';
 import { ApiError, handleError } from './middleware/error';
 import { handleCafeteriaRequest, handleClearCache, handleHealthCheck } from './routes';
-import { mongoDB } from './utils/mongodb';
 import { logger } from './utils/logger';
+import { mongoDB } from './utils/mongodb';
 
 export async function createServer() {
   await mongoDB.connect();
@@ -51,13 +51,13 @@ export async function createServer() {
   });
 
   process.on('SIGINT', async () => {
-    logger.info('Shutting down server...');
+    logger.info('서버 종료 중...', { module: 'server' });
     await mongoDB.disconnect();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
-    logger.info('Shutting down server...');
+    logger.info('서버 종료 중...', { module: 'server' });
     await mongoDB.disconnect();
     process.exit(0);
   });

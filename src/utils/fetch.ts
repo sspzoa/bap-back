@@ -12,7 +12,7 @@ async function getBrowser() {
       session_ttl: 10000,
       proxy_country: 'ANY',
       session_recording: true,
-      defaultViewport: null
+      defaultViewport: null,
     });
   }
   return browserInstance;
@@ -48,7 +48,7 @@ export async function fetchWithTimeout(
   const page = await browser.newPage();
 
   try {
-    logger.debug(`Fetching with Puppeteer: ${url}`);
+    logger.debug('페이지 요청', { module: 'fetch', url });
 
     const cdpSession = await createPuppeteerCDPSession(page);
 
@@ -56,19 +56,15 @@ export async function fetchWithTimeout(
 
     if (solveCaptcha) {
       try {
-        logger.info('캡챠 감지 확인 중...');
         await cdpSession.waitCaptchaDetected();
+        logger.info('캡챠 감지 - 해결 중', { module: 'fetch' });
 
-        logger.info('캡챠가 감지되었습니다. 해결 중...');
         await cdpSession.solveCaptcha();
-
         await cdpSession.waitCaptchaSolved();
-        logger.info('캡챠가 해결되었습니다.');
 
+        logger.info('캡챠 해결 완료', { module: 'fetch' });
         await page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {});
-      } catch (error) {
-        logger.info('캡챠가 감지되지 않았거나 이미 해결되었습니다.');
-      }
+      } catch (error) {}
     }
 
     const content = await page.content();
@@ -95,11 +91,7 @@ export async function fetchWithTimeout(
       },
     } as Response;
   } catch (error) {
-    throw new HttpError(
-      500,
-      `Puppeteer fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      url,
-    );
+    throw new HttpError(500, `Fetch 실패: ${error instanceof Error ? error.message : 'Unknown error'}`, url);
   } finally {
     await page.close();
   }
@@ -129,14 +121,22 @@ export async function fetchWithRetry<T>(
     try {
       if (attempt > 0) {
         const delay = baseDelay * 2 ** (attempt - 1);
-        logger.info(`Retry attempt ${attempt}/${retries} for ${url} after ${delay}ms`);
+        logger.debug('재시도 대기', {
+          module: 'fetch',
+          attempt: `${attempt}/${retries}`,
+          delay: `${delay}ms`,
+        });
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
       const response = await fetchWithTimeout(url, { ...fetchOptions, solveCaptcha });
       return await parser(response);
     } catch (error) {
-      logger.warn(`Attempt ${attempt + 1}/${retries + 1} failed for ${url}:`, error);
+      logger.warn('요청 실패', error, {
+        module: 'fetch',
+        attempt: `${attempt + 1}/${retries + 1}`,
+        url,
+      });
       lastError = error as Error;
 
       if (!(error instanceof HttpError && [408, 429, 500, 502, 503, 504].includes(error.status))) {
@@ -145,12 +145,13 @@ export async function fetchWithRetry<T>(
     }
   }
 
-  throw lastError || new Error(`Failed to fetch ${url} after ${retries + 1} attempts`);
+  throw lastError || new Error(`${retries + 1}번 시도 후 실패: ${url}`);
 }
 
 export async function closeBrowser() {
   if (browserInstance) {
     await browserInstance.close();
     browserInstance = null;
+    logger.debug('브라우저 종료', { module: 'fetch' });
   }
 }

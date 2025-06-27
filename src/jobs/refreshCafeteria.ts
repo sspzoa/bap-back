@@ -1,42 +1,38 @@
-import { getLatestMenuPosts, fetchAndSaveCafeteriaData } from '../services/cafeteria';
-import { formatDate, parseKoreanDate, getKSTDate } from '../utils/date';
-import { logger } from '../utils/logger';
+import { fetchAndSaveCafeteriaData, getLatestMenuPosts } from '../services/cafeteria';
+import { formatDate, getKSTDate, parseKoreanDate } from '../utils/date';
 import { closeBrowser } from '../utils/fetch';
+import { logger } from '../utils/logger';
 
 export async function refreshCafeteriaData(): Promise<void> {
-  logger.info('Starting cafeteria data refresh job');
+  logger.info('식단 데이터 갱신 시작', { module: 'refresh-job' });
 
   try {
     const menuPosts = await getLatestMenuPosts();
-    logger.info(`Found ${menuPosts.length} menu posts to process`);
 
     for (const post of menuPosts) {
       try {
         const postDate = parseKoreanDate(post.title);
         if (!postDate) {
-          logger.warn(`Unable to parse date from post title: ${post.title}`);
+          logger.warn('날짜 파싱 실패', { module: 'refresh-job', title: post.title });
           continue;
         }
 
         const dateKey = formatDate(postDate);
-
-        logger.info(`Fetching menu data for ${dateKey} (${post.title})`);
         await fetchAndSaveCafeteriaData(dateKey, menuPosts);
-        logger.info(`Successfully saved menu data for ${dateKey}`);
       } catch (error) {
-        logger.error(`Error fetching menu for post ${post.title}:`, error);
+        logger.error('메뉴 가져오기 실패', error, {
+          module: 'refresh-job',
+          title: post.title,
+        });
       }
     }
 
-    logger.info('Cafeteria data refresh job completed successfully');
-
-    await closeBrowser();
-    logger.info('Browser closed after refresh completion');
+    logger.info('식단 데이터 갱신 완료', { module: 'refresh-job' });
   } catch (error) {
-    logger.error('Cafeteria data refresh job failed:', error);
-    await closeBrowser();
-    logger.info('Browser closed after refresh failure');
+    logger.error('식단 데이터 갱신 실패', error, { module: 'refresh-job' });
     throw error;
+  } finally {
+    await closeBrowser();
   }
 }
 
@@ -53,7 +49,6 @@ function getNextRunTime(): number {
   const daysUntilSaturday = (targetDay - currentDay + 7) % 7;
 
   if (currentDay === targetDay && now.getHours() < targetHour) {
-
   } else {
     if (daysUntilSaturday === 0) {
       next.setDate(next.getDate() + 7);
@@ -69,15 +64,18 @@ function scheduleNextRun(): NodeJS.Timeout {
   const timeUntilNext = getNextRunTime();
   const nextRunKST = new Date(getKSTDate().getTime() + timeUntilNext);
 
-  logger.info(`Next cafeteria data refresh scheduled for: ${nextRunKST.getFullYear()}. ${nextRunKST.getMonth() + 1}. ${nextRunKST.getDate()}. 오전 ${nextRunKST.getHours()}:${nextRunKST.getMinutes().toString().padStart(2, '0')}:${nextRunKST.getSeconds().toString().padStart(2, '0')} (KST)`);
+  logger.info('다음 갱신 예정', {
+    module: 'refresh-job',
+    nextRun: nextRunKST.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+  });
 
   return <NodeJS.Timeout>setTimeout(() => {
     refreshCafeteriaData()
       .then(() => {
-        logger.info('Scheduled cafeteria data refresh completed successfully');
+        logger.info('정기 갱신 성공', { module: 'refresh-job' });
       })
       .catch((error) => {
-        logger.error('Scheduled cafeteria data refresh failed:', error);
+        logger.error('정기 갱신 실패', error, { module: 'refresh-job' });
       })
       .finally(() => {
         scheduleNextRun();
@@ -86,10 +84,10 @@ function scheduleNextRun(): NodeJS.Timeout {
 }
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
-  logger.info('Setting up cafeteria data refresh job to run weekly on Saturday at 3:00 AM KST');
+  logger.info('갱신 작업 설정 (매주 토요일 오전 3시)', { module: 'refresh-job' });
 
   refreshCafeteriaData().catch((error) => {
-    logger.error('Initial cafeteria data refresh failed:', error);
+    logger.error('초기 갱신 실패', error, { module: 'refresh-job' });
   });
 
   return scheduleNextRun();
