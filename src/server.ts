@@ -4,8 +4,8 @@ import { setupRefreshJob } from './jobs/refreshCafeteria';
 import { handleCors } from './middleware/cors';
 import { ApiError, handleError } from './middleware/error';
 import { handleCafeteriaRequest, handleClearCache, handleHealthCheck } from './routes';
-import { logger } from './utils/logger';
 import { mongoDB } from './utils/mongodb';
+import { logger } from './utils/logger';
 
 export async function createServer() {
   await mongoDB.connect();

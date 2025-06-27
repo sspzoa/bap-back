@@ -1,7 +1,7 @@
-import { type Collection, type Db, MongoClient } from 'mongodb';
+import { MongoClient, type Db, type Collection } from 'mongodb';
 import { CONFIG } from '../config';
-import type { CafeteriaResponse } from '../types';
 import { logger } from './logger';
+import type { CafeteriaResponse } from '../types';
 
 interface MealDataDocument {
   _id: string;
@@ -37,6 +37,7 @@ class MongoDBService {
       logger.error('MongoDB connection failed:', error);
       throw error;
     }
+
   }
 
   private async createIndexes(): Promise<void> {
@@ -81,7 +82,11 @@ class MongoDBService {
       createdAt: now,
     };
 
-    await collection.replaceOne({ _id: date }, document, { upsert: true });
+    await collection.replaceOne(
+      { _id: date },
+      document,
+      { upsert: true }
+    );
 
     logger.info(`Meal data saved for date: ${date}`);
   }
@@ -106,7 +111,8 @@ class MongoDBService {
 
     const totalMealData = await collection.countDocuments();
 
-    const lastMealData = await collection.findOne({}, { sort: { updatedAt: -1 } });
+    const lastMealData = await collection
+      .findOne({}, { sort: { updatedAt: -1 } });
 
     return {
       totalMealData,

@@ -12,7 +12,7 @@ async function getBrowser() {
       session_ttl: 10000,
       proxy_country: 'ANY',
       session_recording: true,
-      defaultViewport: null,
+      defaultViewport: null
     });
   }
   return browserInstance;
@@ -78,15 +78,15 @@ export async function fetchWithTimeout(
       status: status,
       statusText: 'OK',
       headers: new Headers({
-        'content-type': 'text/html; charset=utf-8',
-      }),
+        'content-type': 'text/html; charset=utf-8'
+      })
     });
 
     Object.defineProperty(response, 'url', {
       value: url,
       writable: false,
       enumerable: true,
-      configurable: true,
+      configurable: true
     });
 
     return response;
