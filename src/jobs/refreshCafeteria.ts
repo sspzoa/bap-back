@@ -1,7 +1,7 @@
-import { getLatestMenuPosts, fetchAndSaveCafeteriaData } from '../services/cafeteria';
-import { formatDate, parseKoreanDate, getKSTDate } from '../utils/date';
-import { logger } from '../utils/logger';
+import { fetchAndSaveCafeteriaData, getLatestMenuPosts } from '../services/cafeteria';
+import { formatDate, getKSTDate, parseKoreanDate } from '../utils/date';
 import { closeBrowser } from '../utils/fetch';
+import { logger } from '../utils/logger';
 
 export async function refreshCafeteriaData(): Promise<void> {
   logger.info('Starting cafeteria data refresh job');
@@ -53,7 +53,6 @@ function getNextRunTime(): number {
   const daysUntilSaturday = (targetDay - currentDay + 7) % 7;
 
   if (currentDay === targetDay && now.getHours() < targetHour) {
-
   } else {
     if (daysUntilSaturday === 0) {
       next.setDate(next.getDate() + 7);
@@ -69,7 +68,9 @@ function scheduleNextRun(): NodeJS.Timeout {
   const timeUntilNext = getNextRunTime();
   const nextRunKST = new Date(getKSTDate().getTime() + timeUntilNext);
 
-  logger.info(`Next cafeteria data refresh scheduled for: ${nextRunKST.getFullYear()}. ${nextRunKST.getMonth() + 1}. ${nextRunKST.getDate()}. 오전 ${nextRunKST.getHours()}:${nextRunKST.getMinutes().toString().padStart(2, '0')}:${nextRunKST.getSeconds().toString().padStart(2, '0')} (KST)`);
+  logger.info(
+    `Next cafeteria data refresh scheduled for: ${nextRunKST.getFullYear()}. ${nextRunKST.getMonth() + 1}. ${nextRunKST.getDate()}. 오전 ${nextRunKST.getHours()}:${nextRunKST.getMinutes().toString().padStart(2, '0')}:${nextRunKST.getSeconds().toString().padStart(2, '0')} (KST)`,
+  );
 
   return <NodeJS.Timeout>setTimeout(() => {
     refreshCafeteriaData()
