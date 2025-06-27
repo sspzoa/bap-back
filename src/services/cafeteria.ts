@@ -57,9 +57,9 @@ export function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): M
 const parseMenu = (menuStr: string): string[] => {
   return menuStr
     ? menuStr
-        .split(/\/(?![^()]*\))/)
-        .map((item) => item.trim())
-        .filter(Boolean)
+      .split(/\/(?![^()]*\))/)
+      .map((item) => item.trim())
+      .filter(Boolean)
     : [];
 };
 
