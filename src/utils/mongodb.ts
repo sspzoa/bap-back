@@ -21,7 +21,12 @@ class MongoDBService {
     }
 
     try {
-      this.client = new MongoClient(CONFIG.MONGODB.URI);
+      this.client = new MongoClient(CONFIG.MONGODB.URI, {
+        tls: true,
+        tlsAllowInvalidCertificates: true,
+        tlsAllowInvalidHostnames: true,
+      });
+
       await this.client.connect();
       this.db = this.client.db(CONFIG.MONGODB.DB_NAME);
 
@@ -32,6 +37,7 @@ class MongoDBService {
       logger.error('MongoDB connection failed:', error);
       throw error;
     }
+
   }
 
   private async createIndexes(): Promise<void> {
