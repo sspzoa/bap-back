@@ -4,11 +4,15 @@ import { setupRefreshJob } from './jobs/refreshCafeteria';
 import { handleCors } from './middleware/cors';
 import { ApiError, handleError } from './middleware/error';
 import { handleCafeteriaRequest, handleClearCache, handleHealthCheck } from './routes';
+import { mongoDB } from './utils/mongodb';
+import { logger } from './utils/logger';
 
-export function createServer() {
+export async function createServer() {
+  await mongoDB.connect();
+
   setupRefreshJob();
 
-  return serve({
+  const server = serve({
     port: CONFIG.SERVER.PORT,
 
     async fetch(req: Request) {
@@ -45,4 +49,18 @@ export function createServer() {
       }
     },
   });
+
+  process.on('SIGINT', async () => {
+    logger.info('Shutting down server...');
+    await mongoDB.disconnect();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    logger.info('Shutting down server...');
+    await mongoDB.disconnect();
+    process.exit(0);
+  });
+
+  return server;
 }

@@ -1,20 +1,12 @@
 import * as cheerio from 'cheerio';
 import { CONFIG } from '../config';
 import type { CafeteriaResponse, MenuPost, ProcessedMealMenu } from '../types';
-import { cache } from '../utils/cache';
 import { formatDate, parseKoreanDate } from '../utils/date';
 import { fetchWithRetry } from '../utils/fetch';
 import { logger } from '../utils/logger';
+import { mongoDB } from '../utils/mongodb';
 
 export async function getLatestMenuPosts(): Promise<MenuPost[]> {
-  const cacheKey = 'cafeteria_menu_posts';
-
-  const cachedData = cache.get<MenuPost[]>(cacheKey);
-  if (cachedData) {
-    logger.info('Using cached menu posts data');
-    return cachedData;
-  }
-
   const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}`;
 
   const html = await fetchWithRetry<string>(url, {
@@ -43,7 +35,6 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
     .filter((post): post is MenuPost => post !== null);
 
   if (posts.length > 0) {
-    cache.set(cacheKey, posts);
     logger.info(`Found ${posts.length} menu posts`);
   } else {
     logger.warn('No menu posts found on the website');
@@ -66,21 +57,13 @@ export function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): M
 const parseMenu = (menuStr: string): string[] => {
   return menuStr
     ? menuStr
-        .split(/\/(?![^()]*\))/)
-        .map((item) => item.trim())
-        .filter(Boolean)
+      .split(/\/(?![^()]*\))/)
+      .map((item) => item.trim())
+      .filter(Boolean)
     : [];
 };
 
-export async function getMealData(documentId: string): Promise<CafeteriaResponse> {
-  const cacheKey = `meal_data_${documentId}`;
-
-  const cachedData = cache.get<CafeteriaResponse>(cacheKey);
-  if (cachedData) {
-    logger.info(`Using cached meal data for document ${documentId}`);
-    return cachedData;
-  }
-
+export async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaResponse> {
   const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}&document_srl=${documentId}`;
 
   const html = await fetchWithRetry<string>(url, {
@@ -185,21 +168,24 @@ export async function getMealData(documentId: string): Promise<CafeteriaResponse
     dinner: processedMenu.dinner,
   };
 
-  cache.set(cacheKey, result);
-  logger.info(`Fetched meal data for document ${documentId}`);
+  await mongoDB.saveMealData(dateKey, result, documentId);
+  logger.info(`Fetched and saved meal data for document ${documentId}, date ${dateKey}`);
 
   return result;
 }
 
 export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResponse> {
-  const cacheKey = `cafeteria_${dateParam}`;
-
-  const cachedData = cache.get<CafeteriaResponse>(cacheKey);
+  const cachedData = await mongoDB.getMealData(dateParam);
   if (cachedData) {
-    logger.info(`Using cached cafeteria data for date ${dateParam}`);
+    logger.info(`Using cached cafeteria data from MongoDB for date ${dateParam}`);
     return cachedData;
   }
 
+  logger.warn(`No menu data found for date ${dateParam}`);
+  throw new Error('NO_INFORMATION');
+}
+
+export async function fetchAndSaveCafeteriaData(dateParam: string): Promise<CafeteriaResponse> {
   const menuPosts = await getLatestMenuPosts();
   const targetPost = findMenuPostForDate(menuPosts, dateParam);
 
@@ -224,9 +210,6 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResp
     throw new Error('NO_INFORMATION');
   }
 
-  const mealData = await getMealData(targetPost.documentId);
-
-  cache.set(cacheKey, mealData);
-
+  const mealData = await getMealData(targetPost.documentId, dateParam);
   return mealData;
 }

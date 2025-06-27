@@ -12,13 +12,12 @@ export const CONFIG = {
     LUNCH: '중식',
     DINNER: '석식',
   },
-  CACHE: {
-    TTL: 24 * 60 * 60 * 1000,
-    DB_PATH: './cache.db',
-    CLEANUP_INTERVAL: 60 * 60 * 1000,
+  MONGODB: {
+    URI: process.env.MONGODB_URI || 'mongodb://localhost:27017',
+    DB_NAME: process.env.MONGODB_DB_NAME || ' mongo_db_name',
+    COLLECTION: 'meal_data',
   },
   HTTP: {
-    TIMEOUT: 30000,
     RETRY: {
       COUNT: 3,
       BASE_DELAY: 2000,

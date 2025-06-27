@@ -1,5 +1,4 @@
-import { getLatestMenuPosts, getMealData } from '../services/cafeteria';
-import { cache } from '../utils/cache';
+import { getLatestMenuPosts, fetchAndSaveCafeteriaData } from '../services/cafeteria';
 import { formatDate, parseKoreanDate, getKSTDate } from '../utils/date';
 import { logger } from '../utils/logger';
 import { closeBrowser } from '../utils/fetch';
@@ -8,8 +7,6 @@ export async function refreshCafeteriaData(): Promise<void> {
   logger.info('Starting cafeteria data refresh job');
 
   try {
-    cache.clear();
-
     const menuPosts = await getLatestMenuPosts();
     logger.info(`Found ${menuPosts.length} menu posts to process`);
 
@@ -22,20 +19,12 @@ export async function refreshCafeteriaData(): Promise<void> {
         }
 
         const dateKey = formatDate(postDate);
-        const cacheKey = `cafeteria_${dateKey}`;
 
-        if (cache.has(cacheKey)) {
-          logger.info(`Menu data for ${dateKey} already cached, skipping`);
-          continue;
-        }
-
-        logger.info(`Pre-fetching menu data for ${dateKey} (${post.title})`);
-
-        const mealData = await getMealData(post.documentId);
-        cache.set(cacheKey, mealData);
-        logger.info(`Successfully cached menu data for ${dateKey}`);
+        logger.info(`Fetching menu data for ${dateKey} (${post.title})`);
+        await fetchAndSaveCafeteriaData(dateKey);
+        logger.info(`Successfully saved menu data for ${dateKey}`);
       } catch (error) {
-        logger.error(`Error pre-fetching menu for post ${post.title}:`, error);
+        logger.error(`Error fetching menu for post ${post.title}:`, error);
       }
     }
 
