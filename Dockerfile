@@ -1,10 +1,10 @@
-FROM oven/bun:latest
+FROM node:20-alpine
 WORKDIR /app
 
-COPY package.json ./
-RUN bun install
+COPY package*.json ./
+RUN npm ci --only=production
 
 COPY . .
 
 EXPOSE 3000
-CMD [ "bun", "start" ]
+CMD [ "npm", "start" ]
