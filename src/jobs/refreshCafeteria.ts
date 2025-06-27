@@ -5,8 +5,10 @@ import { logger } from '../utils/logger';
 
 export async function refreshCafeteriaData(): Promise<void> {
   logger.info('식단 데이터 갱신 시작', { module: 'refresh-job' });
+
   try {
     const menuPosts = await getLatestMenuPosts();
+
     for (const post of menuPosts) {
       try {
         const postDate = parseKoreanDate(post.title);
@@ -14,6 +16,7 @@ export async function refreshCafeteriaData(): Promise<void> {
           logger.warn('날짜 파싱 실패', { module: 'refresh-job', title: post.title });
           continue;
         }
+
         const dateKey = formatDate(postDate);
         await fetchAndSaveCafeteriaData(dateKey, menuPosts);
       } catch (error) {
@@ -23,6 +26,7 @@ export async function refreshCafeteriaData(): Promise<void> {
         });
       }
     }
+
     logger.info('식단 데이터 갱신 완료', { module: 'refresh-job' });
   } catch (error) {
     logger.error('식단 데이터 갱신 실패', error, { module: 'refresh-job' });
@@ -35,6 +39,7 @@ export async function refreshCafeteriaData(): Promise<void> {
 function getNextRunTime(): number {
   const now = getKSTDate();
   const next = new Date(now);
+
   const targetDay = 6;
   const targetHour = 3;
 
@@ -47,21 +52,21 @@ function getNextRunTime(): number {
   } else {
     next.setDate(next.getDate() + daysUntilSaturday);
   }
+
   next.setHours(targetHour, 0, 0, 0);
+
   return next.getTime() - now.getTime();
 }
 
 function scheduleNextRun(): NodeJS.Timeout {
   const timeUntilNext = getNextRunTime();
   const nextRunKST = new Date(getKSTDate().getTime() + timeUntilNext);
-  const dateStr = formatDate(nextRunKST);
-  const hours = String(nextRunKST.getHours()).padStart(2, '0');
-  const minutes = String(nextRunKST.getMinutes()).padStart(2, '0');
 
   logger.info('다음 갱신 예정', {
     module: 'refresh-job',
-    nextRun: `${dateStr} ${hours}:${minutes} (KST)`,
+    nextRun: nextRunKST.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
   });
+
   return <NodeJS.Timeout>setTimeout(() => {
     refreshCafeteriaData()
       .then(() => {
@@ -78,8 +83,10 @@ function scheduleNextRun(): NodeJS.Timeout {
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
   logger.info('갱신 작업 설정 (매주 토요일 오전 3시)', { module: 'refresh-job' });
+
   refreshCafeteriaData().catch((error) => {
     logger.error('초기 갱신 실패', error, { module: 'refresh-job' });
   });
+
   return scheduleNextRun();
 }
