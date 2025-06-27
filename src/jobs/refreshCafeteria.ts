@@ -43,17 +43,19 @@ function getNextRunTime(): number {
   const targetDay = 6;
   const targetHour = 3;
 
+  next.setHours(targetHour, 0, 0, 0);
+
   const currentDay = now.getDay();
   const daysUntilSaturday = (targetDay - currentDay + 7) % 7;
 
-  if (daysUntilSaturday === 0 && now.getHours() >= targetHour) {
-    next.setDate(next.getDate() + 7);
-  } else if (daysUntilSaturday === 0) {
+  if (currentDay === targetDay && now.getHours() < targetHour) {
   } else {
-    next.setDate(next.getDate() + daysUntilSaturday);
+    if (daysUntilSaturday === 0) {
+      next.setDate(next.getDate() + 7);
+    } else {
+      next.setDate(next.getDate() + daysUntilSaturday);
+    }
   }
-
-  next.setHours(targetHour, 0, 0, 0);
 
   return next.getTime() - now.getTime();
 }
