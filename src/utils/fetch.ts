@@ -12,7 +12,7 @@ async function getBrowser() {
       session_ttl: 180,
       proxy_country: 'ANY',
       session_recording: true,
-      defaultViewport: null,
+      defaultViewport: null
     });
   }
   return browserInstance;
