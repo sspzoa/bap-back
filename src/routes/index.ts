@@ -1,8 +1,8 @@
 import { corsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
 import { getCafeteriaData } from '../services/cafeteria';
-import { mongoDB } from '../utils/mongodb';
 import { isValidDate } from '../utils/date';
+import { mongoDB } from '../utils/mongodb';
 
 export async function handleHealthCheck(): Promise<Response> {
   const stats = await mongoDB.getStats();
@@ -27,16 +27,19 @@ export async function handleHealthCheck(): Promise<Response> {
 export async function handleClearCache(): Promise<Response> {
   const stats = await mongoDB.getStats();
 
-  return new Response(JSON.stringify({
-    success: true,
-    message: 'MongoDB storage is persistent. No cache to clear.',
-    stats
-  }), {
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'application/json',
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: 'MongoDB storage is persistent. No cache to clear.',
+      stats,
+    }),
+    {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+      },
     },
-  });
+  );
 }
 
 export async function handleCafeteriaRequest(dateParam: string): Promise<Response> {

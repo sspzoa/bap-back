@@ -1,7 +1,7 @@
-import { MongoClient, type Db, type Collection } from 'mongodb';
+import { type Collection, type Db, MongoClient } from 'mongodb';
 import { CONFIG } from '../config';
-import { logger } from './logger';
 import type { CafeteriaResponse } from '../types';
+import { logger } from './logger';
 
 interface MealDataDocument {
   _id: string;
@@ -32,9 +32,9 @@ class MongoDBService {
 
       await this.createIndexes();
 
-      logger.info('MongoDB connected successfully');
+      logger.info('MongoDB 연결 성공', { module: 'mongodb' });
     } catch (error) {
-      logger.error('MongoDB connection failed:', error);
+      logger.error('MongoDB 연결 실패', error, { module: 'mongodb' });
       throw error;
     }
   }
@@ -46,7 +46,7 @@ class MongoDBService {
     await collection.createIndex({ updatedAt: -1 });
     await collection.createIndex({ documentId: 1 });
 
-    logger.info('MongoDB indexes created');
+    logger.debug('인덱스 생성 완료', { module: 'mongodb' });
   }
 
   async disconnect(): Promise<void> {
@@ -54,7 +54,7 @@ class MongoDBService {
       await this.client.close();
       this.client = null;
       this.db = null;
-      logger.info('MongoDB disconnected');
+      logger.info('MongoDB 연결 종료', { module: 'mongodb' });
     }
   }
 
@@ -81,13 +81,9 @@ class MongoDBService {
       createdAt: now,
     };
 
-    await collection.replaceOne(
-      { _id: date },
-      document,
-      { upsert: true }
-    );
+    await collection.replaceOne({ _id: date }, document, { upsert: true });
 
-    logger.info(`Meal data saved for date: ${date}`);
+    logger.debug('데이터 저장', { module: 'mongodb', date });
   }
 
   async getMealData(date: string): Promise<CafeteriaResponse | null> {
@@ -95,7 +91,7 @@ class MongoDBService {
     const document = await collection.findOne({ _id: date });
 
     if (document) {
-      logger.info(`Meal data found in MongoDB for date: ${date}`);
+      logger.debug('데이터 조회', { module: 'mongodb', date });
       return document.data;
     }
 
@@ -110,8 +106,7 @@ class MongoDBService {
 
     const totalMealData = await collection.countDocuments();
 
-    const lastMealData = await collection
-      .findOne({}, { sort: { updatedAt: -1 } });
+    const lastMealData = await collection.findOne({}, { sort: { updatedAt: -1 } });
 
     return {
       totalMealData,
