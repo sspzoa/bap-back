@@ -9,7 +9,7 @@ async function getBrowser() {
     browserInstance = await Puppeteer.connect({
       apiKey: process.env.SCRAPELESS_API_KEY,
       session_name: 'fetchWithPuppeteer',
-      session_ttl: 5000,
+      session_ttl: 6000,
       proxy_country: 'ANY',
       session_recording: true,
       defaultViewport: null
