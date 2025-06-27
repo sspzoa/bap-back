@@ -23,5 +23,5 @@ export const CONFIG = {
       COUNT: 3,
       BASE_DELAY: 2000,
     },
-  }
+  },
 } as const;

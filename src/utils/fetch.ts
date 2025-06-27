@@ -1,6 +1,6 @@
+import { Puppeteer, createPuppeteerCDPSession } from '@scrapeless-ai/sdk';
 import { CONFIG } from '../config';
 import { logger } from './logger';
-import { Puppeteer, createPuppeteerCDPSession } from '@scrapeless-ai/sdk';
 
 let browserInstance: any = null;
 
@@ -90,11 +90,16 @@ export async function fetchWithTimeout(
       text: async () => content,
       blob: async () => new Blob([content]),
       arrayBuffer: async () => new TextEncoder().encode(content).buffer,
-      clone: function() { return { ...this }; },
+      clone: function () {
+        return { ...this };
+      },
     } as Response;
-
   } catch (error) {
-    throw new HttpError(500, `Puppeteer fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`, url);
+    throw new HttpError(
+      500,
+      `Puppeteer fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      url,
+    );
   } finally {
     await page.close();
   }

@@ -1,8 +1,8 @@
 import { getLatestMenuPosts, getMealData } from '../services/cafeteria';
 import { cache } from '../utils/cache';
 import { formatDate, parseKoreanDate } from '../utils/date';
-import { logger } from '../utils/logger';
 import { closeBrowser } from '../utils/fetch';
+import { logger } from '../utils/logger';
 
 export async function refreshCafeteriaData(): Promise<void> {
   logger.info('Starting cafeteria data refresh job');
@@ -68,7 +68,9 @@ function scheduleNextRun(): NodeJS.Timeout {
   const timeUntilNext = getNextRunTime();
   const nextRunDate = new Date(Date.now() + timeUntilNext);
 
-  logger.info(`Next cafeteria data refresh scheduled for: ${nextRunDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
+  logger.info(
+    `Next cafeteria data refresh scheduled for: ${nextRunDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`,
+  );
 
   return <NodeJS.Timeout>setTimeout(() => {
     refreshCafeteriaData()
