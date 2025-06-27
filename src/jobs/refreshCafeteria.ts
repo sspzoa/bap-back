@@ -8,7 +8,7 @@ export async function refreshCafeteriaData(): Promise<void> {
   logger.info('Starting cafeteria data refresh job');
 
   try {
-    cache.delete("cafeteria_menu_posts");
+    cache.clear();
 
     const menuPosts = await getLatestMenuPosts();
     logger.info(`Found ${menuPosts.length} menu posts to process`);
