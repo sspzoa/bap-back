@@ -1,5 +1,22 @@
 import { CONFIG } from '../config';
 import { logger } from './logger';
+import { Puppeteer, createPuppeteerCDPSession } from '@scrapeless-ai/sdk';
+
+let browserInstance: any = null;
+
+async function getBrowser() {
+  if (!browserInstance) {
+    browserInstance = await Puppeteer.connect({
+      apiKey: process.env.SCRAPELESS_API_KEY,
+      session_name: 'fetchWithPuppeteer',
+      session_ttl: 180,
+      proxy_country: 'ANY',
+      session_recording: true,
+      defaultViewport: null,
+    });
+  }
+  return browserInstance;
+}
 
 export class HttpError extends Error {
   constructor(
@@ -24,31 +41,62 @@ export class TimeoutError extends Error {
 
 export async function fetchWithTimeout(
   url: string,
-  options: RequestInit & { timeout?: number } = {},
+  options: RequestInit & { timeout?: number; solveCaptcha?: boolean } = {},
 ): Promise<Response> {
-  const { timeout = CONFIG.HTTP.TIMEOUT, ...fetchOptions } = options;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const { solveCaptcha = false, ...fetchOptions } = options;
+  const browser = await getBrowser();
+  const page = await browser.newPage();
 
   try {
-    logger.debug(`Fetching ${url}`);
-    const response = await fetch(url, {
-      ...fetchOptions,
-      signal: controller.signal,
-    });
+    logger.debug(`Fetching with Puppeteer: ${url}`);
 
-    if (!response.ok) {
-      throw new HttpError(response.status, `Request failed with status ${response.status}`, url);
+    const cdpSession = await createPuppeteerCDPSession(page);
+
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 10000 });
+
+    if (solveCaptcha) {
+      try {
+        logger.info('캡챠 감지 확인 중...');
+        await cdpSession.waitCaptchaDetected();
+
+        logger.info('캡챠가 감지되었습니다. 해결 중...');
+        await cdpSession.solveCaptcha();
+
+        await cdpSession.waitCaptchaSolved();
+        logger.info('캡챠가 해결되었습니다.');
+
+        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {});
+      } catch (error) {
+        logger.info('캡챠가 감지되지 않았거나 이미 해결되었습니다.');
+      }
     }
 
-    return response;
+    const content = await page.content();
+    const status = 200;
+
+    return {
+      ok: true,
+      status,
+      statusText: 'OK',
+      headers: new Headers(),
+      url,
+      json: async () => {
+        try {
+          return JSON.parse(content);
+        } catch {
+          throw new Error('Response is not valid JSON');
+        }
+      },
+      text: async () => content,
+      blob: async () => new Blob([content]),
+      arrayBuffer: async () => new TextEncoder().encode(content).buffer,
+      clone: function() { return { ...this }; },
+    } as Response;
+
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new TimeoutError(`Request timed out after ${timeout}ms`, url);
-    }
-    throw error;
+    throw new HttpError(500, `Puppeteer fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`, url);
   } finally {
-    clearTimeout(timeoutId);
+    await page.close();
   }
 }
 
@@ -58,12 +106,14 @@ export async function fetchWithRetry<T>(
     timeout?: number;
     retries?: number;
     baseDelay?: number;
+    solveCaptcha?: boolean;
     parser?: (response: Response) => Promise<T>;
   } = {},
 ): Promise<T> {
   const {
     retries = CONFIG.HTTP.RETRY.COUNT,
     baseDelay = CONFIG.HTTP.RETRY.BASE_DELAY,
+    solveCaptcha = false,
     parser = (response) => response.json() as Promise<T>,
     ...fetchOptions
   } = options;
@@ -78,20 +128,24 @@ export async function fetchWithRetry<T>(
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
-      const response = await fetchWithTimeout(url, fetchOptions);
+      const response = await fetchWithTimeout(url, { ...fetchOptions, solveCaptcha });
       return await parser(response);
     } catch (error) {
       logger.warn(`Attempt ${attempt + 1}/${retries + 1} failed for ${url}:`, error);
       lastError = error as Error;
 
-      if (
-        !(error instanceof TimeoutError) &&
-        !(error instanceof HttpError && [408, 429, 500, 502, 503, 504].includes(error.status))
-      ) {
+      if (!(error instanceof HttpError && [408, 429, 500, 502, 503, 504].includes(error.status))) {
         throw error;
       }
     }
   }
 
   throw lastError || new Error(`Failed to fetch ${url} after ${retries + 1} attempts`);
+}
+
+export async function closeBrowser() {
+  if (browserInstance) {
+    await browserInstance.close();
+    browserInstance = null;
+  }
 }

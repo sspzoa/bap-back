@@ -18,13 +18,10 @@ export const CONFIG = {
     CLEANUP_INTERVAL: 60 * 60 * 1000,
   },
   HTTP: {
-    TIMEOUT: 5000,
+    TIMEOUT: 30000,
     RETRY: {
       COUNT: 3,
       BASE_DELAY: 2000,
     },
-  },
-  CRON: {
-    REFRESH_INTERVAL: 5 * 60 * 1000,
-  },
+  }
 } as const;

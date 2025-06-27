@@ -18,8 +18,8 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
   const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}`;
 
   const html = await fetchWithRetry<string>(url, {
-    timeout: CONFIG.HTTP.TIMEOUT * 2,
     parser: async (response) => response.text(),
+    solveCaptcha: true,
   });
 
   const $ = cheerio.load(html);
@@ -66,9 +66,9 @@ export function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): M
 const parseMenu = (menuStr: string): string[] => {
   return menuStr
     ? menuStr
-        .split(/\/(?![^()]*\))/)
-        .map((item) => item.trim())
-        .filter(Boolean)
+      .split(/\/(?![^()]*\))/)
+      .map((item) => item.trim())
+      .filter(Boolean)
     : [];
 };
 
@@ -84,7 +84,6 @@ export async function getMealData(documentId: string): Promise<CafeteriaResponse
   const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}&document_srl=${documentId}`;
 
   const html = await fetchWithRetry<string>(url, {
-    timeout: CONFIG.HTTP.TIMEOUT * 2,
     parser: async (response) => response.text(),
   });
 
@@ -163,7 +162,6 @@ export async function getMealData(documentId: string): Promise<CafeteriaResponse
     }
   }
 
-  // Process images directly into each meal object
   $('.xe_content img').each((_, element) => {
     const imgSrc = $(element).attr('src');
     const imgAlt = $(element).attr('alt')?.toLowerCase() || '';
@@ -181,7 +179,6 @@ export async function getMealData(documentId: string): Promise<CafeteriaResponse
     }
   });
 
-  // Create response with the new structure
   const result: CafeteriaResponse = {
     breakfast: processedMenu.breakfast,
     lunch: processedMenu.lunch,
@@ -227,7 +224,6 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResp
     throw new Error('NO_INFORMATION');
   }
 
-  // Get meal data directly in the new structure
   const mealData = await getMealData(targetPost.documentId);
 
   cache.set(cacheKey, mealData);

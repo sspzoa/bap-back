@@ -37,6 +37,8 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           tags: ${{ env.DOCKER_IMAGE }}:latest
+          build-args: |
+            SCRAPELESS_API_KEY=${{ secrets.SCRAPELESS_API_KEY }}
 
   deploy:
     needs: build
@@ -55,4 +57,5 @@ jobs:
           docker rm ${{ env.NAME }} || true
           docker rmi ${{ env.DOCKER_IMAGE }}:latest || true
           docker run -d -p 3002:3000 --name ${{ env.NAME }} --restart always \
+            -e SCRAPELESS_API_KEY=${{ secrets.SCRAPELESS_API_KEY }} \
             ${{ env.DOCKER_IMAGE }}:latest
