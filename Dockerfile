@@ -1,4 +1,4 @@
-FROM oven/bun:latest
+FROM node:alpine:latest
 WORKDIR /app
 
 COPY package.json ./
