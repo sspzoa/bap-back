@@ -8,49 +8,33 @@ enum LogLevel {
 const LOG_LEVEL = (process.env.LOG_LEVEL as keyof typeof LogLevel) || 'INFO';
 const CURRENT_LEVEL = LogLevel[LOG_LEVEL] || LogLevel.INFO;
 
-type LogContext = {
-  module?: string;
-  action?: string;
-  date?: string;
-  documentId?: string;
-  [key: string]: any;
-};
-
-function formatMessage(level: string, message: string, context?: LogContext): string {
+function formatMessage(level: string, message: string): string {
   const timestamp = new Date().toISOString();
-  const contextStr = context
-    ? ` [${Object.entries(context)
-        .map(([k, v]) => `${k}:${v}`)
-        .join(', ')}]`
-    : '';
-  return `[${timestamp}] [${level}]${contextStr} ${message}`;
+  return `[${timestamp}] [${level}] ${message}`;
 }
 
 export const logger = {
-  debug: (message: string, context?: LogContext): void => {
+  debug: (message: string, ...args: any[]): void => {
     if (CURRENT_LEVEL <= LogLevel.DEBUG) {
-      console.debug(formatMessage('DEBUG', message, context));
+      console.debug(formatMessage('DEBUG', message), ...args);
     }
   },
 
-  info: (message: string, context?: LogContext): void => {
+  info: (message: string, ...args: any[]): void => {
     if (CURRENT_LEVEL <= LogLevel.INFO) {
-      console.info(formatMessage('INFO', message, context));
+      console.info(formatMessage('INFO', message), ...args);
     }
   },
 
-  warn: (message: string, error: unknown, context?: LogContext): void => {
+  warn: (message: string, ...args: any[]): void => {
     if (CURRENT_LEVEL <= LogLevel.WARN) {
-      console.warn(formatMessage('WARN', message, context));
+      console.warn(formatMessage('WARN', message), ...args);
     }
   },
 
-  error: (message: string, error?: unknown, context?: LogContext): void => {
+  error: (message: string, ...args: any[]): void => {
     if (CURRENT_LEVEL <= LogLevel.ERROR) {
-      console.error(formatMessage('ERROR', message, context));
-      if (error) {
-        console.error(error);
-      }
+      console.error(formatMessage('ERROR', message), ...args);
     }
   },
 };
