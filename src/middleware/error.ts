@@ -13,7 +13,7 @@ export class ApiError extends Error {
 }
 
 export function handleError(error: unknown): Response {
-  logger.error('Error handling request:', error);
+  logger.error('Request error:', error);
 
   if (error instanceof ApiError) {
     return new Response(JSON.stringify({ error: error.message }), {

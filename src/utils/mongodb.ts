@@ -17,10 +17,12 @@ class MongoDBService {
 
   async connect(): Promise<void> {
     if (this.client && this.db) {
+      logger.info('MongoDB already connected');
       return;
     }
 
     try {
+      logger.info('Connecting to MongoDB...');
       this.client = new MongoClient(CONFIG.MONGODB.URI, {
         tls: true,
         tlsAllowInvalidCertificates: true,
@@ -31,8 +33,7 @@ class MongoDBService {
       this.db = this.client.db(CONFIG.MONGODB.DB_NAME);
 
       await this.createIndexes();
-
-      logger.info('MongoDB connected successfully');
+      logger.info(`Connected to MongoDB database: ${CONFIG.MONGODB.DB_NAME}`);
     } catch (error) {
       logger.error('MongoDB connection failed:', error);
       throw error;
@@ -42,15 +43,16 @@ class MongoDBService {
   private async createIndexes(): Promise<void> {
     if (!this.db) throw new Error('Database not connected');
 
+    logger.info('Creating MongoDB indexes...');
     const collection = this.db.collection<MealDataDocument>(CONFIG.MONGODB.COLLECTION);
     await collection.createIndex({ updatedAt: -1 });
     await collection.createIndex({ documentId: 1 });
-
     logger.info('MongoDB indexes created');
   }
 
   async disconnect(): Promise<void> {
     if (this.client) {
+      logger.info('Disconnecting from MongoDB...');
       await this.client.close();
       this.client = null;
       this.db = null;
@@ -58,14 +60,12 @@ class MongoDBService {
     }
   }
 
-  getDb(): Db {
-    if (!this.db) {
-      throw new Error('Database not connected');
-    }
+  private getDb(): Db {
+    if (!this.db) throw new Error('Database not connected');
     return this.db;
   }
 
-  getMealDataCollection(): Collection<MealDataDocument> {
+  private getMealDataCollection(): Collection<MealDataDocument> {
     return this.getDb().collection<MealDataDocument>(CONFIG.MONGODB.COLLECTION);
   }
 
@@ -73,32 +73,39 @@ class MongoDBService {
     const collection = this.getMealDataCollection();
     const now = new Date();
 
-    const document: MealDataDocument = {
-      _id: date,
-      data,
-      documentId,
-      updatedAt: now,
-      createdAt: now,
-    };
+    logger.info(`Saving meal data for ${date}`);
 
-    await collection.replaceOne(
+    const result = await collection.findOneAndUpdate(
       { _id: date },
-      document,
-      { upsert: true }
+      {
+        $set: {
+          data,
+          documentId,
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          createdAt: now,
+        }
+      },
+      { upsert: true, returnDocument: 'before' }
     );
 
-    logger.info(`Meal data saved for date: ${date}`);
+    const isUpdate = result !== null;
+    logger.info(`Meal data ${isUpdate ? 'updated' : 'created'} for ${date}`);
   }
 
   async getMealData(date: string): Promise<CafeteriaResponse | null> {
     const collection = this.getMealDataCollection();
+    logger.info(`Querying meal data for ${date}`);
+
     const document = await collection.findOne({ _id: date });
 
     if (document) {
-      logger.info(`Meal data found in MongoDB for date: ${date}`);
+      logger.info(`Found meal data for ${date}`);
       return document.data;
     }
 
+    logger.info(`No meal data found for ${date}`);
     return null;
   }
 
@@ -106,17 +113,18 @@ class MongoDBService {
     totalMealData: number;
     lastUpdated: Date | null;
   }> {
+    logger.info('Getting MongoDB statistics');
     const collection = this.getMealDataCollection();
-
     const totalMealData = await collection.countDocuments();
+    const lastMealData = await collection.findOne({}, { sort: { updatedAt: -1 } });
 
-    const lastMealData = await collection
-      .findOne({}, { sort: { updatedAt: -1 } });
-
-    return {
+    const stats = {
       totalMealData,
       lastUpdated: lastMealData?.updatedAt || null,
     };
+
+    logger.info(`MongoDB stats: ${totalMealData} documents, last updated: ${stats.lastUpdated?.toISOString() || 'never'}`);
+    return stats;
   }
 }
 

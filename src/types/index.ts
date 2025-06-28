@@ -21,8 +21,3 @@ export interface CafeteriaResponse {
   lunch: ProcessedMeal;
   dinner: ProcessedMeal;
 }
-
-export interface HealthResponse {
-  status: string;
-  cacheStatus: Record<string, boolean>;
-}

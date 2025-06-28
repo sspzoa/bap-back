@@ -3,14 +3,17 @@ import { CONFIG } from './config';
 import { setupRefreshJob } from './jobs/refreshCafeteria';
 import { handleCors } from './middleware/cors';
 import { ApiError, handleError } from './middleware/error';
-import { handleCafeteriaRequest, handleClearCache, handleHealthCheck } from './routes';
+import { handleCafeteriaRequest, handleHealthCheck } from './routes';
 import { mongoDB } from './utils/mongodb';
 import { logger } from './utils/logger';
 
 export async function createServer() {
+  logger.info('Starting server initialization...');
+
   await mongoDB.connect();
 
-  setupRefreshJob();
+  const refreshJob = setupRefreshJob();
+  logger.info('Refresh job scheduled');
 
   const server = serve({
     port: CONFIG.SERVER.PORT,
@@ -18,6 +21,9 @@ export async function createServer() {
     async fetch(req: Request) {
       const url = new URL(req.url);
       const path = url.pathname;
+      const method = req.method;
+
+      logger.info(`${method} ${path}`);
 
       try {
         const corsResponse = handleCors(req);
@@ -27,22 +33,17 @@ export async function createServer() {
           return await handleHealthCheck();
         }
 
-        if (path === '/clear-cache' && req.method === 'POST') {
-          return await handleClearCache();
-        }
-
-        const datePattern = /^\/(\d{4}-\d{2}-\d{2})$/;
-        const dateMatch = path.match(datePattern);
-
+        const dateMatch = path.match(/^\/(\d{4}-\d{2}-\d{2})$/);
         if (dateMatch) {
-          const dateParam = dateMatch[1];
-          return await handleCafeteriaRequest(dateParam);
+          logger.info(`Fetching cafeteria data for date: ${dateMatch[1]}`);
+          return await handleCafeteriaRequest(dateMatch[1]);
         }
 
         if (path === '/') {
           return new Response('api.밥.net');
         }
 
+        logger.warn(`Unknown endpoint accessed: ${path}`);
         throw new ApiError(404, 'Endpoint not found');
       } catch (error) {
         return handleError(error);
@@ -50,17 +51,17 @@ export async function createServer() {
     },
   });
 
-  process.on('SIGINT', async () => {
-    logger.info('Shutting down server...');
+  const shutdown = async () => {
+    logger.info('Shutdown signal received');
+    if (refreshJob) clearTimeout(refreshJob);
     await mongoDB.disconnect();
+    logger.info('Server shutdown complete');
     process.exit(0);
-  });
+  };
 
-  process.on('SIGTERM', async () => {
-    logger.info('Shutting down server...');
-    await mongoDB.disconnect();
-    process.exit(0);
-  });
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
+  logger.info('Server initialization complete');
   return server;
 }
