@@ -46,22 +46,26 @@ export async function refreshCafeteriaData(): Promise<void> {
 }
 
 function getNextRunTime(): number {
-  const now = getKSTDate();
-  const next = new Date(now);
+  const nowUTC = new Date();
+
+  const nowKST = new Date(nowUTC.getTime() + (9 * 60 * 60 * 1000));
 
   const targetDay = 6; // Saturday
-  const targetHour = 3; // 3 AM
+  const targetHour = 3; // 3 AM KST
 
-  next.setHours(targetHour, 0, 0, 0);
-
-  const currentDay = now.getDay();
+  const nextKST = new Date(nowKST);
+  const currentDay = nowKST.getDay();
   const daysUntilSaturday = (targetDay - currentDay + 7) % 7;
 
-  if (currentDay !== targetDay || now.getHours() >= targetHour) {
-    next.setDate(next.getDate() + (daysUntilSaturday || 7));
+  if (currentDay !== targetDay || nowKST.getHours() >= targetHour) {
+    nextKST.setDate(nextKST.getDate() + (daysUntilSaturday || 7));
   }
 
-  return next.getTime() - now.getTime();
+  nextKST.setHours(targetHour, 0, 0, 0);
+
+  const nextUTC = new Date(nextKST.getTime() - (9 * 60 * 60 * 1000));
+
+  return nextUTC.getTime() - nowUTC.getTime();
 }
 
 function scheduleNextRun(): NodeJS.Timeout {
