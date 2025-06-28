@@ -14,7 +14,7 @@ export const CONFIG = {
   },
   MONGODB: {
     URI: process.env.MONGODB_URI || 'mongodb://localhost:27017',
-    DB_NAME: process.env.MONGODB_DB_NAME || ' mongo_db_name',
+    DB_NAME: process.env.MONGODB_DB_NAME || 'mongo_db_name',
     COLLECTION: 'meal_data',
   },
   HTTP: {

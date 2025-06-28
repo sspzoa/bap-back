@@ -8,6 +8,7 @@ import { mongoDB } from '../utils/mongodb';
 
 export async function getLatestMenuPosts(): Promise<MenuPost[]> {
   const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}`;
+  logger.info('Fetching menu posts from website');
 
   const html = await fetchWithRetry<string>(url, {
     parser: async (response) => response.text(),
@@ -34,37 +35,30 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
     .get()
     .filter((post): post is MenuPost => post !== null);
 
-  if (posts.length > 0) {
-    logger.info(`Found ${posts.length} menu posts`);
-  } else {
-    logger.warn('No menu posts found on the website');
-  }
-
+  logger.info(`Extracted ${posts.length} valid menu posts`);
   return posts;
 }
 
-export function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost | undefined {
+function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost | undefined {
   const targetDate = new Date(dateParam);
 
   return menuPosts.find((post) => {
     const postDate = parseKoreanDate(post.title);
-    if (!postDate) return false;
-
-    return formatDate(postDate) === formatDate(targetDate);
+    return postDate && formatDate(postDate) === formatDate(targetDate);
   });
 }
 
-const parseMenu = (menuStr: string): string[] => {
-  return menuStr
+const parseMenu = (menuStr: string): string[] =>
+  menuStr
     ? menuStr
       .split(/\/(?![^()]*\))/)
       .map((item) => item.trim())
       .filter(Boolean)
     : [];
-};
 
-export async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaResponse> {
+async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaResponse> {
   const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}&document_srl=${documentId}`;
+  logger.info(`Fetching meal data for document ${documentId}`);
 
   const html = await fetchWithRetry<string>(url, {
     parser: async (response) => response.text(),
@@ -78,73 +72,54 @@ export async function getMealData(documentId: string, dateKey: string): Promise<
     .map((line) => line.trim())
     .filter(Boolean);
 
+  logger.info(`Parsing ${contentLines.length} content lines`);
+
   const processedMenu: ProcessedMealMenu = {
     breakfast: { regular: [], simple: [], image: '' },
     lunch: { regular: [], simple: [], image: '' },
     dinner: { regular: [], simple: [], image: '' },
   };
 
-  let currentMealType: 'breakfast' | 'lunch' | 'dinner' | null = null;
+  const parseMealLine = (line: string, mealType: string) => {
+    const mealText = line.replace(`*${mealType}:`, '').trim();
+    const simpleMealIndex = mealText.indexOf('<간편식>');
 
-  for (let i = 0; i < contentLines.length; i++) {
-    const line = contentLines[i];
+    if (simpleMealIndex !== -1) {
+      return {
+        regular: parseMenu(mealText.substring(0, simpleMealIndex).trim()),
+        simple: parseMenu(mealText.substring(simpleMealIndex + 5).trim())
+      };
+    }
 
+    return {
+      regular: parseMenu(mealText),
+      simple: []
+    };
+  };
+
+  let mealCount = 0;
+  for (const line of contentLines) {
     if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
-      currentMealType = 'breakfast';
-      const mealText = line.replace(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`, '').trim();
-
-      const simpleMealIndex = mealText.indexOf('<간편식>');
-      if (simpleMealIndex !== -1) {
-        const regularText = mealText.substring(0, simpleMealIndex).trim();
-        const simpleText = mealText.substring(simpleMealIndex + 5).trim();
-
-        processedMenu.breakfast.regular = parseMenu(regularText);
-        processedMenu.breakfast.simple = parseMenu(simpleText);
-      } else {
-        processedMenu.breakfast.regular = parseMenu(mealText);
-      }
+      const { regular, simple } = parseMealLine(line, CONFIG.MEAL_TYPES.BREAKFAST);
+      processedMenu.breakfast.regular = regular;
+      processedMenu.breakfast.simple = simple;
+      mealCount++;
     } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
-      currentMealType = 'lunch';
-      const mealText = line.replace(`*${CONFIG.MEAL_TYPES.LUNCH}:`, '').trim();
-
-      const simpleMealIndex = mealText.indexOf('<간편식>');
-      if (simpleMealIndex !== -1) {
-        const regularText = mealText.substring(0, simpleMealIndex).trim();
-        const simpleText = mealText.substring(simpleMealIndex + 5).trim();
-
-        processedMenu.lunch.regular = parseMenu(regularText);
-        processedMenu.lunch.simple = parseMenu(simpleText);
-      } else {
-        processedMenu.lunch.regular = parseMenu(mealText);
-      }
+      const { regular, simple } = parseMealLine(line, CONFIG.MEAL_TYPES.LUNCH);
+      processedMenu.lunch.regular = regular;
+      processedMenu.lunch.simple = simple;
+      mealCount++;
     } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)) {
-      currentMealType = 'dinner';
-      const mealText = line.replace(`*${CONFIG.MEAL_TYPES.DINNER}:`, '').trim();
-
-      const simpleMealIndex = mealText.indexOf('<간편식>');
-      if (simpleMealIndex !== -1) {
-        const regularText = mealText.substring(0, simpleMealIndex).trim();
-        const simpleText = mealText.substring(simpleMealIndex + 5).trim();
-
-        processedMenu.dinner.regular = parseMenu(regularText);
-        processedMenu.dinner.simple = parseMenu(simpleText);
-      } else {
-        processedMenu.dinner.regular = parseMenu(mealText);
-      }
-    } else if (line.startsWith('<간편식>') && currentMealType) {
-      const simpleText = line.replace('<간편식>', '').trim();
-      const simpleItems = parseMenu(simpleText);
-
-      if (currentMealType === 'breakfast') {
-        processedMenu.breakfast.simple = simpleItems;
-      } else if (currentMealType === 'lunch') {
-        processedMenu.lunch.simple = simpleItems;
-      } else if (currentMealType === 'dinner') {
-        processedMenu.dinner.simple = simpleItems;
-      }
+      const { regular, simple } = parseMealLine(line, CONFIG.MEAL_TYPES.DINNER);
+      processedMenu.dinner.regular = regular;
+      processedMenu.dinner.simple = simple;
+      mealCount++;
     }
   }
 
+  logger.info(`Parsed ${mealCount} meal types`);
+
+  let imageCount = 0;
   $('.xe_content img').each((_, element) => {
     const imgSrc = $(element).attr('src');
     const imgAlt = $(element).attr('alt')?.toLowerCase() || '';
@@ -154,13 +129,18 @@ export async function getMealData(documentId: string, dateKey: string): Promise<
 
       if (imgAlt.includes('조')) {
         processedMenu.breakfast.image = fullUrl;
+        imageCount++;
       } else if (imgAlt.includes('중')) {
         processedMenu.lunch.image = fullUrl;
+        imageCount++;
       } else if (imgAlt.includes('석')) {
         processedMenu.dinner.image = fullUrl;
+        imageCount++;
       }
     }
   });
+
+  logger.info(`Found ${imageCount} meal images`);
 
   const result: CafeteriaResponse = {
     breakfast: processedMenu.breakfast,
@@ -169,19 +149,21 @@ export async function getMealData(documentId: string, dateKey: string): Promise<
   };
 
   await mongoDB.saveMealData(dateKey, result, documentId);
-  logger.info(`Fetched and saved meal data for document ${documentId}, date ${dateKey}`);
+  logger.info(`Saved meal data for ${dateKey}`);
 
   return result;
 }
 
 export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResponse> {
+  logger.info(`Getting cafeteria data for ${dateParam}`);
+
   const cachedData = await mongoDB.getMealData(dateParam);
   if (cachedData) {
-    logger.info(`Using cached cafeteria data from MongoDB for date ${dateParam}`);
+    logger.info(`Found cached data for ${dateParam}`);
     return cachedData;
   }
 
-  logger.warn(`No menu data found for date ${dateParam}`);
+  logger.warn(`No data found for ${dateParam}`);
   throw new Error('NO_INFORMATION');
 }
 
@@ -189,10 +171,12 @@ export async function fetchAndSaveCafeteriaData(
   dateParam: string,
   menuPosts: MenuPost[]
 ): Promise<CafeteriaResponse> {
+  logger.info(`Fetching and saving data for ${dateParam}`);
+
   const targetPost = findMenuPostForDate(menuPosts, dateParam);
 
   if (!targetPost) {
-    logger.warn(`No menu post found for date ${dateParam}`);
+    logger.warn(`No menu post found for ${dateParam}`);
 
     const targetDate = new Date(dateParam);
 
@@ -207,11 +191,14 @@ export async function fetchAndSaveCafeteriaData(
     });
 
     if (hasPreviousDate && hasLaterDate) {
+      logger.info(`Date ${dateParam} falls between posts - no operation day`);
       throw new Error('NO_OPERATION');
     }
+
+    logger.info(`No information available for ${dateParam}`);
     throw new Error('NO_INFORMATION');
   }
 
-  const mealData = await getMealData(targetPost.documentId, dateParam);
-  return mealData;
+  logger.info(`Found post for ${dateParam}: ${targetPost.title}`);
+  return await getMealData(targetPost.documentId, dateParam);
 }

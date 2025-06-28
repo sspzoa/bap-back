@@ -4,39 +4,44 @@ import { logger } from '../utils/logger';
 import { closeBrowser } from '../utils/fetch';
 
 export async function refreshCafeteriaData(): Promise<void> {
-  logger.info('Starting cafeteria data refresh job');
+  logger.info('Starting cafeteria data refresh');
+  const startTime = Date.now();
 
   try {
     const menuPosts = await getLatestMenuPosts();
     logger.info(`Found ${menuPosts.length} menu posts to process`);
 
+    let successCount = 0;
+    let errorCount = 0;
+
     for (const post of menuPosts) {
       try {
         const postDate = parseKoreanDate(post.title);
         if (!postDate) {
-          logger.warn(`Unable to parse date from post title: ${post.title}`);
+          logger.warn(`Unable to parse date from title: ${post.title}`);
           continue;
         }
 
         const dateKey = formatDate(postDate);
+        logger.info(`Processing menu for ${dateKey} (${post.title})`);
 
-        logger.info(`Fetching menu data for ${dateKey} (${post.title})`);
         await fetchAndSaveCafeteriaData(dateKey, menuPosts);
-        logger.info(`Successfully saved menu data for ${dateKey}`);
+        successCount++;
+        logger.info(`Successfully saved menu for ${dateKey}`);
       } catch (error) {
-        logger.error(`Error fetching menu for post ${post.title}:`, error);
+        errorCount++;
+        logger.error(`Failed to fetch menu for ${post.title}:`, error);
       }
     }
 
-    logger.info('Cafeteria data refresh job completed successfully');
-
-    await closeBrowser();
-    logger.info('Browser closed after refresh completion');
+    const duration = Date.now() - startTime;
+    logger.info(`Refresh completed in ${duration}ms - Success: ${successCount}, Errors: ${errorCount}`);
   } catch (error) {
-    logger.error('Cafeteria data refresh job failed:', error);
-    await closeBrowser();
-    logger.info('Browser closed after refresh failure');
+    logger.error('Cafeteria refresh failed:', error);
     throw error;
+  } finally {
+    await closeBrowser();
+    logger.info('Browser closed');
   }
 }
 
@@ -44,22 +49,16 @@ function getNextRunTime(): number {
   const now = getKSTDate();
   const next = new Date(now);
 
-  const targetDay = 6;
-  const targetHour = 3;
+  const targetDay = 6; // Saturday
+  const targetHour = 3; // 3 AM
 
   next.setHours(targetHour, 0, 0, 0);
 
   const currentDay = now.getDay();
   const daysUntilSaturday = (targetDay - currentDay + 7) % 7;
 
-  if (currentDay === targetDay && now.getHours() < targetHour) {
-
-  } else {
-    if (daysUntilSaturday === 0) {
-      next.setDate(next.getDate() + 7);
-    } else {
-      next.setDate(next.getDate() + daysUntilSaturday);
-    }
+  if (currentDay !== targetDay || now.getHours() >= targetHour) {
+    next.setDate(next.getDate() + (daysUntilSaturday || 7));
   }
 
   return next.getTime() - now.getTime();
@@ -67,29 +66,27 @@ function getNextRunTime(): number {
 
 function scheduleNextRun(): NodeJS.Timeout {
   const timeUntilNext = getNextRunTime();
-  const nextRunKST = new Date(getKSTDate().getTime() + timeUntilNext);
+  const nextRunDate = new Date(getKSTDate().getTime() + timeUntilNext);
 
-  logger.info(`Next cafeteria data refresh scheduled for: ${nextRunKST.getFullYear()}. ${nextRunKST.getMonth() + 1}. ${nextRunKST.getDate()}. 오전 ${nextRunKST.getHours()}:${nextRunKST.getMinutes().toString().padStart(2, '0')}:${nextRunKST.getSeconds().toString().padStart(2, '0')} (KST)`);
+  logger.info(`Next refresh scheduled for: ${nextRunDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
 
-  return <NodeJS.Timeout>setTimeout(() => {
-    refreshCafeteriaData()
-      .then(() => {
-        logger.info('Scheduled cafeteria data refresh completed successfully');
-      })
-      .catch((error) => {
-        logger.error('Scheduled cafeteria data refresh failed:', error);
-      })
-      .finally(() => {
-        scheduleNextRun();
-      });
+  return <NodeJS.Timeout>setTimeout(async () => {
+    logger.info('Executing scheduled refresh');
+    try {
+      await refreshCafeteriaData();
+    } catch (error) {
+      logger.error('Scheduled refresh failed:', error);
+    } finally {
+      scheduleNextRun();
+    }
   }, timeUntilNext);
 }
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
-  logger.info('Setting up cafeteria data refresh job to run weekly on Saturday at 3:00 AM KST');
+  logger.info('Setting up cafeteria refresh job (weekly, Saturday 3AM KST)');
 
   refreshCafeteriaData().catch((error) => {
-    logger.error('Initial cafeteria data refresh failed:', error);
+    logger.error('Initial refresh failed:', error);
   });
 
   return scheduleNextRun();
