@@ -14,17 +14,11 @@ export function isValidDate(dateString: string): boolean {
   return !Number.isNaN(date.getTime());
 }
 
-export function getKSTDate(): Date {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  return new Date(utc + 9 * 60 * 60 * 1000);
-}
-
 export function parseKoreanDate(text: string): Date | null {
   const match = text.match(/(\d+)월\s*(\d+)일/);
   if (!match) return null;
 
   const [, month, day] = match;
-  const currentYear = getKSTDate().getFullYear();
+  const currentYear = new Date().getFullYear();
   return new Date(currentYear, Number.parseInt(month) - 1, Number.parseInt(day));
 }

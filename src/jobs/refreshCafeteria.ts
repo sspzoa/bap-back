@@ -1,5 +1,5 @@
 import { getLatestMenuPosts, fetchAndSaveCafeteriaData } from '../services/cafeteria';
-import { formatDate, parseKoreanDate, getKSTDate } from '../utils/date';
+import { formatDate, parseKoreanDate } from '../utils/date';
 import { logger } from '../utils/logger';
 import { closeBrowser } from '../utils/fetch';
 
@@ -46,33 +46,28 @@ export async function refreshCafeteriaData(): Promise<void> {
 }
 
 function getNextRunTime(): number {
-  const nowUTC = new Date();
-
-  const nowKST = new Date(nowUTC.getTime() + (9 * 60 * 60 * 1000));
-
+  const now = new Date();
   const targetDay = 6; // Saturday
-  const targetHour = 3; // 3 AM KST
+  const targetHour = 3; // 3 AM
 
-  const nextKST = new Date(nowKST);
-  const currentDay = nowKST.getDay();
+  const next = new Date(now);
+  const currentDay = now.getDay();
   const daysUntilSaturday = (targetDay - currentDay + 7) % 7;
 
-  if (currentDay !== targetDay || nowKST.getHours() >= targetHour) {
-    nextKST.setDate(nextKST.getDate() + (daysUntilSaturday || 7));
+  if (currentDay !== targetDay || now.getHours() >= targetHour) {
+    next.setDate(next.getDate() + (daysUntilSaturday || 7));
   }
 
-  nextKST.setHours(targetHour, 0, 0, 0);
+  next.setHours(targetHour, 0, 0, 0);
 
-  const nextUTC = new Date(nextKST.getTime() - (9 * 60 * 60 * 1000));
-
-  return nextUTC.getTime() - nowUTC.getTime();
+  return next.getTime() - now.getTime();
 }
 
 function scheduleNextRun(): NodeJS.Timeout {
   const timeUntilNext = getNextRunTime();
-  const nextRunDate = new Date(getKSTDate().getTime() + timeUntilNext);
+  const nextRunDate = new Date(Date.now() + timeUntilNext);
 
-  logger.info(`Next refresh scheduled for: ${nextRunDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
+  logger.info(`Next refresh scheduled for: ${nextRunDate.toLocaleString()}`);
 
   return <NodeJS.Timeout>setTimeout(async () => {
     logger.info('Executing scheduled refresh');
@@ -87,7 +82,7 @@ function scheduleNextRun(): NodeJS.Timeout {
 }
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
-  logger.info('Setting up cafeteria refresh job (weekly, Saturday 3AM KST)');
+  logger.info('Setting up cafeteria refresh job (weekly, Saturday 3AM)');
 
   refreshCafeteriaData().catch((error) => {
     logger.error('Initial refresh failed:', error);

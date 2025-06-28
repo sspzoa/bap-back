@@ -1,6 +1,8 @@
 FROM oven/bun:latest
 WORKDIR /app
 
+ENV TZ=Asia/Seoul
+
 COPY package.json ./
 RUN bun install
 
