@@ -24,7 +24,7 @@ export interface CafeteriaData {
 
 export interface CafeteriaResponse {
   requestId: string;
-  requestedDate: string;
+  date: string;
   timestamp: string;
   data: CafeteriaData;
 }
