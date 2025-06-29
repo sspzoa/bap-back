@@ -80,44 +80,89 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     dinner: { regular: [], simple: [], image: '' },
   };
 
-  const parseMealLine = (line: string, mealType: string) => {
-    const mealText = line.replace(`*${mealType}:`, '').trim();
-    const simpleMealIndex = mealText.indexOf('<간편식>');
-
-    if (simpleMealIndex !== -1) {
-      return {
-        regular: parseMenu(mealText.substring(0, simpleMealIndex).trim()),
-        simple: parseMenu(mealText.substring(simpleMealIndex + 5).trim())
-      };
+  const parseMealSection = (lines: string[], startIndex: number, mealType: string) => {
+    const mealLine = lines[startIndex];
+    const mealText = mealLine.replace(`*${mealType}:`, '').trim();
+    
+    let regular = parseMenu(mealText);
+    let simple: string[] = [];
+    
+    for (let i = startIndex + 1; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (line.startsWith('*조식:') || line.startsWith('*중식:') || line.startsWith('*석식:')) {
+        break;
+      }
+      
+      const simpleMealPatterns = [
+        /^<간편식>\s*/,
+        /^\[간편식\]\s*/,
+        /^간편식:\s*/,
+        /^간편식\s*-\s*/,
+        /^\(간편식\)\s*/
+      ];
+      
+      for (const pattern of simpleMealPatterns) {
+        if (pattern.test(line)) {
+          const simpleMealText = line.replace(pattern, '').trim();
+          simple = parseMenu(simpleMealText);
+          logger.info(`Found simple meal for ${mealType}: "${simpleMealText}"`);
+          break;
+        }
+      }
+      
+      if (simple.length > 0 || line === '') {
+        continue;
+      }
+      
+      break;
     }
-
-    return {
-      regular: parseMenu(mealText),
-      simple: []
-    };
+    
+    return { regular, simple };
   };
 
   let mealCount = 0;
-  for (const line of contentLines) {
+  for (let i = 0; i < contentLines.length; i++) {
+    const line = contentLines[i];
+    logger.debug(`Processing line ${i}: ${line}`);
+    
     if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
-      const { regular, simple } = parseMealLine(line, CONFIG.MEAL_TYPES.BREAKFAST);
+      const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.BREAKFAST);
       processedMenu.breakfast.regular = regular;
       processedMenu.breakfast.simple = simple;
       mealCount++;
+      logger.info(`Breakfast - Regular: ${regular.length} items, Simple: ${simple.length} items`);
     } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
-      const { regular, simple } = parseMealLine(line, CONFIG.MEAL_TYPES.LUNCH);
+      const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.LUNCH);
       processedMenu.lunch.regular = regular;
       processedMenu.lunch.simple = simple;
       mealCount++;
+      logger.info(`Lunch - Regular: ${regular.length} items, Simple: ${simple.length} items`);
     } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)) {
-      const { regular, simple } = parseMealLine(line, CONFIG.MEAL_TYPES.DINNER);
+      const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.DINNER);
       processedMenu.dinner.regular = regular;
       processedMenu.dinner.simple = simple;
       mealCount++;
+      logger.info(`Dinner - Regular: ${regular.length} items, Simple: ${simple.length} items`);
     }
   }
 
   logger.info(`Parsed ${mealCount} meal types`);
+
+  logger.debug('Final processed menu:', {
+    breakfast: {
+      regular: processedMenu.breakfast.regular,
+      simple: processedMenu.breakfast.simple
+    },
+    lunch: {
+      regular: processedMenu.lunch.regular,
+      simple: processedMenu.lunch.simple
+    },
+    dinner: {
+      regular: processedMenu.dinner.regular,
+      simple: processedMenu.dinner.simple
+    }
+  });
 
   let imageCount = 0;
   $('.xe_content img').each((_, element) => {
