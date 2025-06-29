@@ -13,7 +13,7 @@ async function getBrowser() {
       session_ttl: 10000,
       proxy_country: 'ANY',
       session_recording: true,
-      defaultViewport: null
+      defaultViewport: null,
     });
   }
   return browserInstance;
@@ -68,15 +68,13 @@ async function fetchWithTimeout(
       text: async () => content,
       blob: async () => new Blob([content]),
       arrayBuffer: async () => new TextEncoder().encode(content).buffer,
-      clone: function () { return { ...this }; },
+      clone: function () {
+        return { ...this };
+      },
     } as Response;
   } catch (error) {
     fetchLogger.error(`Fetch failed: ${url}`, error);
-    throw new HttpError(
-      500,
-      `Fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      url,
-    );
+    throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`, url);
   } finally {
     await page.close();
   }

@@ -16,8 +16,26 @@ export interface ProcessedMealMenu {
   dinner: ProcessedMeal;
 }
 
-export interface CafeteriaResponse {
+export interface CafeteriaData {
   breakfast: ProcessedMeal;
   lunch: ProcessedMeal;
   dinner: ProcessedMeal;
+}
+
+export interface CafeteriaResponse {
+  requestId: string;
+  requestedDate: string;
+  timestamp: string;
+  data: CafeteriaData;
+}
+
+export interface HealthCheckResponse {
+  requestId: string;
+  timestamp: string;
+  status: string;
+  database: {
+    connected: boolean;
+    totalMealData: number;
+    lastUpdated: Date | null;
+  };
 }

@@ -1,11 +1,15 @@
 import { serve } from 'bun';
 import { CONFIG } from './config';
 import { setupRefreshJob } from './jobs/refreshCafeteria';
-import { handleCors } from './middleware/cors';
+import { corsHeaders, handleCors } from './middleware/cors';
 import { ApiError, handleError } from './middleware/error';
 import { handleCafeteriaRequest, handleHealthCheck } from './routes';
-import { mongoDB } from './utils/mongodb';
 import { logger } from './utils/logger';
+import { mongoDB } from './utils/mongodb';
+
+function generateRequestId(): string {
+  return Math.random().toString(36).substr(2, 8);
+}
 
 export async function createServer() {
   logger.info('Starting server initialization');
@@ -25,6 +29,7 @@ export async function createServer() {
         const method = req.method;
 
         const requestLogger = logger.request(method, path);
+        const requestId = requestLogger.context.requestId || generateRequestId();
         const startTime = Date.now();
 
         try {
@@ -37,13 +42,25 @@ export async function createServer() {
           let response: Response;
 
           if (path === '/health') {
-            response = await handleHealthCheck();
+            response = await handleHealthCheck(requestId);
           } else if (path === '/') {
-            response = new Response('api.밥.net');
+            response = new Response(
+              JSON.stringify({
+                requestId,
+                timestamp: new Date().toISOString(),
+                message: 'api.밥.net',
+              }),
+              {
+                headers: {
+                  ...corsHeaders,
+                  'Content-Type': 'application/json',
+                },
+              },
+            );
           } else {
             const dateMatch = path.match(/^\/(\d{4}-\d{2}-\d{2})$/);
             if (dateMatch) {
-              response = await handleCafeteriaRequest(dateMatch[1]);
+              response = await handleCafeteriaRequest(dateMatch[1], requestId);
             } else {
               throw new ApiError(404, 'Endpoint not found');
             }
@@ -54,7 +71,7 @@ export async function createServer() {
         } catch (error) {
           const duration = Date.now() - startTime;
           requestLogger.error(`Request failed after ${duration}ms`, error);
-          return handleError(error);
+          return handleError(error, requestId);
         }
       },
     });

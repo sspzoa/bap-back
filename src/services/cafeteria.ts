@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { CONFIG } from '../config';
-import type { CafeteriaResponse, MenuPost, ProcessedMealMenu } from '../types';
+import type { CafeteriaData, MenuPost, ProcessedMealMenu } from '../types';
 import { formatDate, parseKoreanDate } from '../utils/date';
 import { fetchWithRetry } from '../utils/fetch';
 import { logger } from '../utils/logger';
@@ -55,12 +55,12 @@ function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost
 const parseMenu = (menuStr: string): string[] =>
   menuStr
     ? menuStr
-      .split(/\/(?![^()]*\))/)
-      .map((item) => item.trim())
-      .filter(Boolean)
+        .split(/\/(?![^()]*\))/)
+        .map((item) => item.trim())
+        .filter(Boolean)
     : [];
 
-async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaResponse> {
+async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaData> {
   const mealLogger = logger.operation('parse-meal', dateKey);
   const timer = mealLogger.time();
 
@@ -88,7 +88,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       const mealLine = lines[startIndex];
       const mealText = mealLine.replace(`*${mealType}:`, '').trim();
 
-      let regular = parseMenu(mealText);
+      const regular = parseMenu(mealText);
       let simple: string[] = [];
 
       for (let i = startIndex + 1; i < lines.length; i++) {
@@ -103,7 +103,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
           /^\[간편식\]\s*/,
           /^간편식:\s*/,
           /^간편식\s*-\s*/,
-          /^\(간편식\)\s*/
+          /^\(간편식\)\s*/,
         ];
 
         for (const pattern of simpleMealPatterns) {
@@ -153,7 +153,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       }
     });
 
-    const result: CafeteriaResponse = {
+    const result: CafeteriaData = {
       breakfast: processedMenu.breakfast,
       lunch: processedMenu.lunch,
       dinner: processedMenu.dinner,
@@ -169,7 +169,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
   }
 }
 
-export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResponse> {
+export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData> {
   const cachedData = await mongoDB.getMealData(dateParam);
   if (cachedData) {
     return cachedData;
@@ -178,10 +178,7 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaResp
   throw new Error('NO_INFORMATION');
 }
 
-export async function fetchAndSaveCafeteriaData(
-  dateParam: string,
-  menuPosts: MenuPost[]
-): Promise<CafeteriaResponse> {
+export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: MenuPost[]): Promise<CafeteriaData> {
   const targetPost = findMenuPostForDate(menuPosts, dateParam);
 
   if (!targetPost) {
