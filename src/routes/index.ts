@@ -37,8 +37,8 @@ export async function handleCafeteriaRequest(dateParam: string, requestId: strin
 
     const response: CafeteriaResponse = {
       requestId,
-      requestedDate: dateParam,
       timestamp: new Date().toISOString(),
+      date: dateParam,
       data,
     };
 
