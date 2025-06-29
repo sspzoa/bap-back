@@ -23,11 +23,15 @@ export interface CafeteriaData {
 }
 
 export interface CafeteriaResponse {
+  requestId: string;
   date: string;
+  timestamp: string;
   data: CafeteriaData;
 }
 
 export interface HealthCheckResponse {
+  requestId: string;
+  timestamp: string;
   status: string;
   database: {
     connected: boolean;
