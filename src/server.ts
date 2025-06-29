@@ -42,12 +42,10 @@ export async function createServer() {
           let response: Response;
 
           if (path === '/health') {
-            response = await handleHealthCheck(requestId);
+            response = await handleHealthCheck();
           } else if (path === '/') {
             response = new Response(
               JSON.stringify({
-                requestId,
-                timestamp: new Date().toISOString(),
                 message: 'api.밥.net',
               }),
               {
@@ -60,7 +58,7 @@ export async function createServer() {
           } else {
             const dateMatch = path.match(/^\/(\d{4}-\d{2}-\d{2})$/);
             if (dateMatch) {
-              response = await handleCafeteriaRequest(dateMatch[1], requestId);
+              response = await handleCafeteriaRequest(dateMatch[1]);
             } else {
               throw new ApiError(404, 'Endpoint not found');
             }
@@ -71,7 +69,7 @@ export async function createServer() {
         } catch (error) {
           const duration = Date.now() - startTime;
           requestLogger.error(`Request failed after ${duration}ms`, error);
-          return handleError(error, requestId);
+          return handleError(error);
         }
       },
     });
