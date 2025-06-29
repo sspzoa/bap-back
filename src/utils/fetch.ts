@@ -6,7 +6,7 @@ let browserInstance: any = null;
 
 async function getBrowser() {
   if (!browserInstance) {
-    logger.info('Creating new browser instance');
+    logger.info('Creating browser instance');
     browserInstance = await Puppeteer.connect({
       apiKey: process.env.SCRAPELESS_API_KEY,
       session_name: 'fetchWithPuppeteer',
@@ -37,28 +37,26 @@ async function fetchWithTimeout(
   const { solveCaptcha = false } = options;
   const browser = await getBrowser();
   const page = await browser.newPage();
+  const fetchLogger = logger.operation('fetch');
 
   try {
-    logger.info(`Navigating to ${url}`);
-    const cdpSession = await createPuppeteerCDPSession(page);
     await page.goto(url, { waitUntil: 'networkidle2' });
 
     if (solveCaptcha) {
       try {
-        logger.info('Checking for captcha...');
+        const cdpSession = await createPuppeteerCDPSession(page);
         await cdpSession.waitCaptchaDetected();
-        logger.info('Captcha detected, solving...');
+        fetchLogger.info('Solving captcha');
         await cdpSession.solveCaptcha();
         await cdpSession.waitCaptchaSolved();
-        logger.info('Captcha solved successfully');
+        fetchLogger.info('Captcha solved');
         await page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {});
       } catch {
-        logger.info('No captcha detected or already solved');
+        // No captcha detected
       }
     }
 
     const content = await page.content();
-    logger.info(`Successfully fetched content from ${url}`);
 
     return {
       ok: true,
@@ -73,7 +71,7 @@ async function fetchWithTimeout(
       clone: function () { return { ...this }; },
     } as Response;
   } catch (error) {
-    logger.error(`Failed to fetch ${url}:`, error);
+    fetchLogger.error(`Fetch failed: ${url}`, error);
     throw new HttpError(
       500,
       `Fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -102,13 +100,14 @@ export async function fetchWithRetry<T>(
     ...fetchOptions
   } = options;
 
+  const retryLogger = logger.operation('fetch-retry');
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       if (attempt > 0) {
         const delay = baseDelay * 2 ** (attempt - 1);
-        logger.info(`Retry attempt ${attempt}/${retries} for ${url} (waiting ${delay}ms)`);
+        retryLogger.warn(`Retry ${attempt}/${retries} after ${delay}ms`, { url });
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
@@ -116,7 +115,6 @@ export async function fetchWithRetry<T>(
       return await parser(response);
     } catch (error) {
       lastError = error as Error;
-      logger.warn(`Attempt ${attempt + 1}/${retries + 1} failed for ${url}`);
 
       if (!(error instanceof HttpError && [408, 429, 500, 502, 503, 504].includes(error.status))) {
         throw error;
@@ -124,7 +122,7 @@ export async function fetchWithRetry<T>(
     }
   }
 
-  logger.error(`All retry attempts failed for ${url}`);
+  retryLogger.error(`All retries failed for ${url}`);
   throw lastError || new Error(`Failed to fetch ${url} after ${retries + 1} attempts`);
 }
 

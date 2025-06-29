@@ -8,60 +8,75 @@ import { mongoDB } from './utils/mongodb';
 import { logger } from './utils/logger';
 
 export async function createServer() {
-  logger.info('Starting server initialization...');
+  logger.info('Starting server initialization');
 
-  await mongoDB.connect();
+  try {
+    await mongoDB.connect();
+    const refreshJob = setupRefreshJob();
 
-  const refreshJob = setupRefreshJob();
-  logger.info('Refresh job scheduled');
+    logger.info(`Server running at http://${CONFIG.SERVER.HOST}:${CONFIG.SERVER.PORT}`);
 
-  const server = serve({
-    port: CONFIG.SERVER.PORT,
+    const server = serve({
+      port: CONFIG.SERVER.PORT,
 
-    async fetch(req: Request) {
-      const url = new URL(req.url);
-      const path = url.pathname;
-      const method = req.method;
+      async fetch(req: Request) {
+        const url = new URL(req.url);
+        const path = url.pathname;
+        const method = req.method;
 
-      logger.info(`${method} ${path}`);
+        const requestLogger = logger.request(method, path);
+        const startTime = Date.now();
 
+        try {
+          const corsResponse = handleCors(req);
+          if (corsResponse) {
+            requestLogger.response(204, Date.now() - startTime);
+            return corsResponse;
+          }
+
+          let response: Response;
+
+          if (path === '/health') {
+            response = await handleHealthCheck();
+          } else if (path === '/') {
+            response = new Response('api.밥.net');
+          } else {
+            const dateMatch = path.match(/^\/(\d{4}-\d{2}-\d{2})$/);
+            if (dateMatch) {
+              response = await handleCafeteriaRequest(dateMatch[1]);
+            } else {
+              throw new ApiError(404, 'Endpoint not found');
+            }
+          }
+
+          requestLogger.response(response.status, Date.now() - startTime);
+          return response;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          requestLogger.error(`Request failed after ${duration}ms`, error);
+          return handleError(error);
+        }
+      },
+    });
+
+    const shutdown = async () => {
+      logger.info('Shutting down server');
       try {
-        const corsResponse = handleCors(req);
-        if (corsResponse) return corsResponse;
-
-        if (path === '/health') {
-          return await handleHealthCheck();
-        }
-
-        const dateMatch = path.match(/^\/(\d{4}-\d{2}-\d{2})$/);
-        if (dateMatch) {
-          logger.info(`Fetching cafeteria data for date: ${dateMatch[1]}`);
-          return await handleCafeteriaRequest(dateMatch[1]);
-        }
-
-        if (path === '/') {
-          return new Response('api.밥.net');
-        }
-
-        logger.warn(`Unknown endpoint accessed: ${path}`);
-        throw new ApiError(404, 'Endpoint not found');
+        if (refreshJob) clearTimeout(refreshJob);
+        await mongoDB.disconnect();
+        logger.info('Server shutdown complete');
       } catch (error) {
-        return handleError(error);
+        logger.error('Error during shutdown', error);
       }
-    },
-  });
+      process.exit(0);
+    };
 
-  const shutdown = async () => {
-    logger.info('Shutdown signal received');
-    if (refreshJob) clearTimeout(refreshJob);
-    await mongoDB.disconnect();
-    logger.info('Server shutdown complete');
-    process.exit(0);
-  };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-
-  logger.info('Server initialization complete');
-  return server;
+    return server;
+  } catch (error) {
+    logger.error('Server initialization failed', error);
+    throw error;
+  }
 }
