@@ -1,7 +1,7 @@
-import { getLatestMenuPosts, fetchAndSaveCafeteriaData } from '../services/cafeteria';
+import { fetchAndSaveCafeteriaData, getLatestMenuPosts } from '../services/cafeteria';
 import { formatDate, parseKoreanDate } from '../utils/date';
-import { logger } from '../utils/logger';
 import { closeBrowser } from '../utils/fetch';
+import { logger } from '../utils/logger';
 
 export async function refreshCafeteriaData(): Promise<void> {
   const refreshLogger = logger.operation('refresh');
@@ -34,7 +34,6 @@ export async function refreshCafeteriaData(): Promise<void> {
     }
 
     timer(`Refresh completed: ${successCount} success, ${errorCount} errors`);
-
   } catch (error) {
     refreshLogger.error('Cafeteria refresh failed', error);
     throw error;

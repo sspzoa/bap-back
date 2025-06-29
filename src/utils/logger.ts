@@ -39,7 +39,7 @@ function formatContext(context?: LogContext): string {
 }
 
 export class Logger {
-  private context: LogContext = {};
+  public context: LogContext = {};
 
   constructor(initialContext: LogContext = {}) {
     this.context = { ...initialContext };
@@ -72,9 +72,12 @@ export class Logger {
 
   error(message: string, error?: any): void {
     if (CURRENT_LEVEL <= LogLevel.ERROR) {
-      const errorStr = error instanceof Error ?
-        `\n${error.name}: ${error.message}\n${error.stack}` :
-        error ? ` ${JSON.stringify(error)}` : '';
+      const errorStr =
+        error instanceof Error
+          ? `\n${error.name}: ${error.message}\n${error.stack}`
+          : error
+            ? ` ${JSON.stringify(error)}`
+            : '';
       console.error(formatMessage('ERROR', message + errorStr, this.context));
     }
   }

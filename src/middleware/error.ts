@@ -12,21 +12,19 @@ export class ApiError extends Error {
   }
 }
 
-export function handleError(error: unknown): Response {
+export function handleError(error: unknown, requestId?: string): Response {
   logger.error('Request error:', error);
 
-  if (error instanceof ApiError) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: error.status,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json',
-      },
-    });
-  }
+  const errorResponse = {
+    requestId: requestId || 'unknown',
+    timestamp: new Date().toISOString(),
+    error: error instanceof ApiError ? error.message : 'Internal server error',
+  };
 
-  return new Response(JSON.stringify({ error: 'Internal server error' }), {
-    status: 500,
+  const status = error instanceof ApiError ? error.status : 500;
+
+  return new Response(JSON.stringify(errorResponse), {
+    status,
     headers: {
       ...corsHeaders,
       'Content-Type': 'application/json',

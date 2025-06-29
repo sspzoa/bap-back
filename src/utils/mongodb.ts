@@ -1,14 +1,12 @@
-import { MongoClient, type Db, type Collection } from 'mongodb';
+import { type Collection, type Db, MongoClient } from 'mongodb';
 import { CONFIG } from '../config';
+import type { CafeteriaData } from '../types';
 import { logger } from './logger';
-import type { CafeteriaResponse } from '../types';
 
 interface MealDataDocument {
   _id: string;
-  data: CafeteriaResponse;
+  data: CafeteriaData;
   documentId: string;
-  updatedAt: Date;
-  createdAt: Date;
 }
 
 class MongoDBService {
@@ -43,7 +41,6 @@ class MongoDBService {
     if (!this.db) throw new Error('Database not connected');
 
     const collection = this.db.collection<MealDataDocument>(CONFIG.MONGODB.COLLECTION);
-    await collection.createIndex({ updatedAt: -1 });
     await collection.createIndex({ documentId: 1 });
   }
 
@@ -65,17 +62,13 @@ class MongoDBService {
     return this.getDb().collection<MealDataDocument>(CONFIG.MONGODB.COLLECTION);
   }
 
-  async saveMealData(date: string, data: CafeteriaResponse, documentId: string): Promise<void> {
+  async saveMealData(date: string, data: CafeteriaData, documentId: string): Promise<void> {
     const collection = this.getMealDataCollection();
-    const now = new Date();
 
     const result = await collection.findOneAndUpdate(
       { _id: date },
-      {
-        $set: { data, documentId, updatedAt: now },
-        $setOnInsert: { createdAt: now }
-      },
-      { upsert: true, returnDocument: 'before' }
+      { $set: { data, documentId } },
+      { upsert: true, returnDocument: 'before' },
     );
 
     if (!result) {
@@ -83,7 +76,7 @@ class MongoDBService {
     }
   }
 
-  async getMealData(date: string): Promise<CafeteriaResponse | null> {
+  async getMealData(date: string): Promise<CafeteriaData | null> {
     const collection = this.getMealDataCollection();
     const document = await collection.findOne({ _id: date });
     return document?.data || null;
@@ -95,11 +88,10 @@ class MongoDBService {
   }> {
     const collection = this.getMealDataCollection();
     const totalMealData = await collection.countDocuments();
-    const lastMealData = await collection.findOne({}, { sort: { updatedAt: -1 } });
 
     return {
       totalMealData,
-      lastUpdated: lastMealData?.updatedAt || null,
+      lastUpdated: null,
     };
   }
 }

@@ -1,20 +1,25 @@
 import { corsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
 import { getCafeteriaData } from '../services/cafeteria';
-import { mongoDB } from '../utils/mongodb';
+import type { CafeteriaResponse, HealthCheckResponse } from '../types';
 import { isValidDate } from '../utils/date';
+import { mongoDB } from '../utils/mongodb';
 
-export async function handleHealthCheck(): Promise<Response> {
+export async function handleHealthCheck(requestId: string): Promise<Response> {
   const stats = await mongoDB.getStats();
 
-  return new Response(JSON.stringify({
+  const response: HealthCheckResponse = {
+    requestId,
+    timestamp: new Date().toISOString(),
     status: 'ok',
     database: {
       connected: true,
       totalMealData: stats.totalMealData,
       lastUpdated: stats.lastUpdated,
     },
-  }), {
+  };
+
+  return new Response(JSON.stringify(response), {
     headers: {
       ...corsHeaders,
       'Content-Type': 'application/json',
@@ -22,14 +27,22 @@ export async function handleHealthCheck(): Promise<Response> {
   });
 }
 
-export async function handleCafeteriaRequest(dateParam: string): Promise<Response> {
+export async function handleCafeteriaRequest(dateParam: string, requestId: string): Promise<Response> {
   if (!isValidDate(dateParam)) {
     throw new ApiError(400, 'Invalid date format');
   }
 
   try {
     const data = await getCafeteriaData(dateParam);
-    return new Response(JSON.stringify(data), {
+
+    const response: CafeteriaResponse = {
+      requestId,
+      requestedDate: dateParam,
+      timestamp: new Date().toISOString(),
+      data,
+    };
+
+    return new Response(JSON.stringify(response), {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/json',
