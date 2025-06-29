@@ -12,10 +12,12 @@ export class ApiError extends Error {
   }
 }
 
-export function handleError(error: unknown): Response {
+export function handleError(error: unknown, requestId?: string): Response {
   logger.error('Request error:', error);
 
   const errorResponse = {
+    requestId: requestId || 'unknown',
+    timestamp: new Date().toISOString(),
     error: error instanceof ApiError ? error.message : 'Internal server error',
   };
 

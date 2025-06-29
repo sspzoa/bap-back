@@ -5,10 +5,12 @@ import type { CafeteriaResponse, HealthCheckResponse } from '../types';
 import { isValidDate } from '../utils/date';
 import { mongoDB } from '../utils/mongodb';
 
-export async function handleHealthCheck(): Promise<Response> {
+export async function handleHealthCheck(requestId: string): Promise<Response> {
   const stats = await mongoDB.getStats();
 
   const response: HealthCheckResponse = {
+    requestId,
+    timestamp: new Date().toISOString(),
     status: 'ok',
     database: {
       connected: true,
@@ -25,7 +27,7 @@ export async function handleHealthCheck(): Promise<Response> {
   });
 }
 
-export async function handleCafeteriaRequest(dateParam: string): Promise<Response> {
+export async function handleCafeteriaRequest(dateParam: string, requestId: string): Promise<Response> {
   if (!isValidDate(dateParam)) {
     throw new ApiError(400, 'Invalid date format');
   }
@@ -34,6 +36,8 @@ export async function handleCafeteriaRequest(dateParam: string): Promise<Respons
     const data = await getCafeteriaData(dateParam);
 
     const response: CafeteriaResponse = {
+      requestId,
+      timestamp: new Date().toISOString(),
       date: dateParam,
       data,
     };
