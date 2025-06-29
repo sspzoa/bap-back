@@ -17,12 +17,11 @@ class MongoDBService {
 
   async connect(): Promise<void> {
     if (this.client && this.db) {
-      logger.info('MongoDB already connected');
       return;
     }
 
     try {
-      logger.info('Connecting to MongoDB...');
+      logger.info('Connecting to MongoDB');
       this.client = new MongoClient(CONFIG.MONGODB.URI, {
         tls: true,
         tlsAllowInvalidCertificates: true,
@@ -31,11 +30,11 @@ class MongoDBService {
 
       await this.client.connect();
       this.db = this.client.db(CONFIG.MONGODB.DB_NAME);
-
       await this.createIndexes();
-      logger.info(`Connected to MongoDB database: ${CONFIG.MONGODB.DB_NAME}`);
+
+      logger.info(`Connected to MongoDB: ${CONFIG.MONGODB.DB_NAME}`);
     } catch (error) {
-      logger.error('MongoDB connection failed:', error);
+      logger.error('MongoDB connection failed', error);
       throw error;
     }
   }
@@ -43,16 +42,13 @@ class MongoDBService {
   private async createIndexes(): Promise<void> {
     if (!this.db) throw new Error('Database not connected');
 
-    logger.info('Creating MongoDB indexes...');
     const collection = this.db.collection<MealDataDocument>(CONFIG.MONGODB.COLLECTION);
     await collection.createIndex({ updatedAt: -1 });
     await collection.createIndex({ documentId: 1 });
-    logger.info('MongoDB indexes created');
   }
 
   async disconnect(): Promise<void> {
     if (this.client) {
-      logger.info('Disconnecting from MongoDB...');
       await this.client.close();
       this.client = null;
       this.db = null;
@@ -73,58 +69,38 @@ class MongoDBService {
     const collection = this.getMealDataCollection();
     const now = new Date();
 
-    logger.info(`Saving meal data for ${date}`);
-
     const result = await collection.findOneAndUpdate(
       { _id: date },
       {
-        $set: {
-          data,
-          documentId,
-          updatedAt: now,
-        },
-        $setOnInsert: {
-          createdAt: now,
-        }
+        $set: { data, documentId, updatedAt: now },
+        $setOnInsert: { createdAt: now }
       },
       { upsert: true, returnDocument: 'before' }
     );
 
-    const isUpdate = result !== null;
-    logger.info(`Meal data ${isUpdate ? 'updated' : 'created'} for ${date}`);
+    if (!result) {
+      logger.info(`Saved meal data: ${date}`);
+    }
   }
 
   async getMealData(date: string): Promise<CafeteriaResponse | null> {
     const collection = this.getMealDataCollection();
-    logger.info(`Querying meal data for ${date}`);
-
     const document = await collection.findOne({ _id: date });
-
-    if (document) {
-      logger.info(`Found meal data for ${date}`);
-      return document.data;
-    }
-
-    logger.info(`No meal data found for ${date}`);
-    return null;
+    return document?.data || null;
   }
 
   async getStats(): Promise<{
     totalMealData: number;
     lastUpdated: Date | null;
   }> {
-    logger.info('Getting MongoDB statistics');
     const collection = this.getMealDataCollection();
     const totalMealData = await collection.countDocuments();
     const lastMealData = await collection.findOne({}, { sort: { updatedAt: -1 } });
 
-    const stats = {
+    return {
       totalMealData,
       lastUpdated: lastMealData?.updatedAt || null,
     };
-
-    logger.info(`MongoDB stats: ${totalMealData} documents, last updated: ${stats.lastUpdated?.toISOString() || 'never'}`);
-    return stats;
   }
 }
 
