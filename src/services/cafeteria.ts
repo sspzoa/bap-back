@@ -160,7 +160,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     };
 
     await mongoDB.saveMealData(dateKey, result, documentId);
-    timer(`Parsed and saved meal data`);
+    timer('Parsed and saved meal data');
 
     return result;
   } catch (error) {
@@ -173,6 +173,21 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData
   const cachedData = await mongoDB.getMealData(dateParam);
   if (cachedData) {
     return cachedData;
+  }
+
+  const targetDate = new Date(dateParam);
+  const previousDate = new Date(targetDate);
+  previousDate.setDate(targetDate.getDate() - 1);
+  const nextDate = new Date(targetDate);
+  nextDate.setDate(targetDate.getDate() + 1);
+
+  const [prevData, nextData] = await Promise.all([
+    mongoDB.getMealData(formatDate(previousDate)),
+    mongoDB.getMealData(formatDate(nextDate)),
+  ]);
+
+  if (prevData && nextData) {
+    throw new Error('NO_OPERATION');
   }
 
   throw new Error('NO_INFORMATION');
