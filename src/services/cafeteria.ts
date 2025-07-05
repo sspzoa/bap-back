@@ -55,9 +55,9 @@ function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost
 const parseMenu = (menuStr: string): string[] =>
   menuStr
     ? menuStr
-        .split(/\/(?![^()]*\))/)
-        .map((item) => item.trim())
-        .filter(Boolean)
+      .split(/\/(?![^()]*\))/)
+      .map((item) => item.trim())
+      .filter(Boolean)
     : [];
 
 async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaData> {
@@ -175,22 +175,21 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData
     return cachedData;
   }
 
-  const targetDate = new Date(dateParam);
-  const previousDate = new Date(targetDate);
-  previousDate.setDate(targetDate.getDate() - 1);
-  const nextDate = new Date(targetDate);
-  nextDate.setDate(targetDate.getDate() + 1);
+  const { earliest, latest } = await mongoDB.getDateRange();
 
-  const [prevData, nextData] = await Promise.all([
-    mongoDB.getMealData(formatDate(previousDate)),
-    mongoDB.getMealData(formatDate(nextDate)),
-  ]);
-
-  if (prevData && nextData) {
-    throw new Error('NO_OPERATION');
+  if (!earliest || !latest) {
+    throw new Error('NO_INFORMATION');
   }
 
-  throw new Error('NO_INFORMATION');
+  const targetDate = new Date(dateParam);
+  const earliestDate = new Date(earliest);
+  const latestDate = new Date(latest);
+
+  if (targetDate < earliestDate || targetDate > latestDate) {
+    throw new Error('NO_INFORMATION');
+  }
+
+  throw new Error('NO_OPERATION');
 }
 
 export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: MenuPost[]): Promise<CafeteriaData> {
@@ -198,19 +197,24 @@ export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: Me
 
   if (!targetPost) {
     const targetDate = new Date(dateParam);
-    const hasPreviousDate = menuPosts.some((post) => {
-      const postDate = parseKoreanDate(post.title);
-      return postDate && postDate < targetDate;
-    });
-    const hasLaterDate = menuPosts.some((post) => {
-      const postDate = parseKoreanDate(post.title);
-      return postDate && postDate > targetDate;
-    });
 
-    if (hasPreviousDate && hasLaterDate) {
-      throw new Error('NO_OPERATION');
+    const postDates = menuPosts
+      .map(post => parseKoreanDate(post.title))
+      .filter((date): date is Date => date !== null)
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    if (postDates.length === 0) {
+      throw new Error('NO_INFORMATION');
     }
-    throw new Error('NO_INFORMATION');
+
+    const earliestDate = postDates[0];
+    const latestDate = postDates[postDates.length - 1];
+
+    if (targetDate < earliestDate || targetDate > latestDate) {
+      throw new Error('NO_INFORMATION');
+    }
+
+    throw new Error('NO_OPERATION');
   }
 
   return await getMealData(targetPost.documentId, dateParam);
