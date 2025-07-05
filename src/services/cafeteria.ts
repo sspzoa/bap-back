@@ -52,13 +52,38 @@ function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost
   });
 }
 
-const parseMenu = (menuStr: string): string[] =>
-  menuStr
-    ? menuStr
-      .split(/\/(?![^()]*\))/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-    : [];
+const parseMenu = (menuStr: string): string[] => {
+  if (!menuStr) return [];
+
+  const items: string[] = [];
+  let current = '';
+  let parenDepth = 0;
+
+  for (let i = 0; i < menuStr.length; i++) {
+    const char = menuStr[i];
+
+    if (char === '(') {
+      parenDepth++;
+      current += char;
+    } else if (char === ')') {
+      parenDepth--;
+      current += char;
+    } else if (char === '/' && parenDepth === 0) {
+      if (current.trim()) {
+        items.push(current.trim());
+      }
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  if (current.trim()) {
+    items.push(current.trim());
+  }
+
+  return items;
+};
 
 async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaData> {
   const mealLogger = logger.operation('parse-meal', dateKey);
@@ -98,20 +123,9 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
           break;
         }
 
-        const simpleMealPatterns = [
-          /^<간편식>\s*/,
-          /^\[간편식\]\s*/,
-          /^간편식:\s*/,
-          /^간편식\s*-\s*/,
-          /^\(간편식\)\s*/,
-        ];
-
-        for (const pattern of simpleMealPatterns) {
-          if (pattern.test(line)) {
-            const simpleMealText = line.replace(pattern, '').trim();
-            simple = parseMenu(simpleMealText);
-            break;
-          }
+        if (/^<간편식>\s*/.test(line)) {
+          const simpleMealText = line.replace(/^<간편식>\s*/, '').trim();
+          simple = parseMenu(simpleMealText);
         }
 
         if (simple.length > 0 || line === '') {
