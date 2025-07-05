@@ -111,6 +111,18 @@ class MongoDBService {
       lastUpdated: lastDocument?.updatedAt || null,
     };
   }
+
+  async getDateRange(): Promise<{ earliest: string | null; latest: string | null }> {
+    const collection = this.getMealDataCollection();
+
+    const [earliest] = await collection.find().sort({ _id: 1 }).limit(1).toArray();
+    const [latest] = await collection.find().sort({ _id: -1 }).limit(1).toArray();
+
+    return {
+      earliest: earliest?._id || null,
+      latest: latest?._id || null,
+    };
+  }
 }
 
 export const mongoDB = new MongoDBService();
