@@ -39,3 +39,11 @@ export interface HealthCheckResponse {
     lastUpdated: Date | null;
   };
 }
+
+export interface MealDataDocument {
+  _id: string;
+  data: CafeteriaData;
+  documentId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

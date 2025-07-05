@@ -1,13 +1,7 @@
 import { type Collection, type Db, MongoClient } from 'mongodb';
 import { CONFIG } from '../config';
-import type { CafeteriaData } from '../types';
+import type { CafeteriaData, MealDataDocument } from '../types';
 import { logger } from './logger';
-
-interface MealDataDocument {
-  _id: string;
-  data: CafeteriaData;
-  documentId: string;
-}
 
 class MongoDBService {
   private client: MongoClient | null = null;
@@ -42,6 +36,8 @@ class MongoDBService {
 
     const collection = this.db.collection<MealDataDocument>(CONFIG.MONGODB.COLLECTION);
     await collection.createIndex({ documentId: 1 });
+    await collection.createIndex({ createdAt: 1 });
+    await collection.createIndex({ updatedAt: 1 });
   }
 
   async disconnect(): Promise<void> {
@@ -64,14 +60,30 @@ class MongoDBService {
 
   async saveMealData(date: string, data: CafeteriaData, documentId: string): Promise<void> {
     const collection = this.getMealDataCollection();
+    const now = new Date();
 
-    const result = await collection.findOneAndUpdate(
-      { _id: date },
-      { $set: { data, documentId } },
-      { upsert: true, returnDocument: 'before' },
-    );
+    const existingDoc = await collection.findOne({ _id: date });
 
-    if (!result) {
+    if (existingDoc) {
+      await collection.updateOne(
+        { _id: date },
+        {
+          $set: {
+            data,
+            documentId,
+            updatedAt: now
+          }
+        }
+      );
+      logger.info(`Updated meal data: ${date}`);
+    } else {
+      await collection.insertOne({
+        _id: date,
+        data,
+        documentId,
+        createdAt: now,
+        updatedAt: now
+      });
       logger.info(`Saved meal data: ${date}`);
     }
   }
@@ -89,9 +101,14 @@ class MongoDBService {
     const collection = this.getMealDataCollection();
     const totalMealData = await collection.countDocuments();
 
+    const lastDocument = await collection.findOne(
+      {},
+      { sort: { updatedAt: -1 } }
+    );
+
     return {
       totalMealData,
-      lastUpdated: null,
+      lastUpdated: lastDocument?.updatedAt || null,
     };
   }
 }
