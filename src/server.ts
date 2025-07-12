@@ -3,7 +3,7 @@ import { CONFIG } from './config';
 import { setupRefreshJob } from './jobs/refreshCafeteria';
 import { getCorsHeaders, handleCors } from './middleware/cors';
 import { ApiError, handleError } from './middleware/error';
-import { handleCafeteriaRequest, handleHealthCheck, handleRefreshRequest } from './routes';
+import { handleCafeteriaRequest, handleHealthCheck } from './routes';
 import { logger } from './utils/logger';
 import { mongoDB } from './utils/mongodb';
 
@@ -44,9 +44,6 @@ export async function createServer() {
           if (path === '/health') {
             const origin = req.headers.get('Origin');
             response = await handleHealthCheck(requestId, origin);
-          } else if (path === '/refresh') {
-            const origin = req.headers.get('Origin');
-            response = await handleRefreshRequest(requestId, origin);
           } else if (path === '/') {
             const origin = req.headers.get('Origin');
             response = new Response(
