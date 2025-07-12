@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { getCorsHeaders } from './cors';
+import { corsHeaders } from './cors';
 
 export class ApiError extends Error {
   constructor(
@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-export function handleError(error: unknown, requestId?: string, origin: string | null = null): Response {
+export function handleError(error: unknown, requestId?: string): Response {
   logger.error('Request error:', error);
 
   const errorResponse = {
@@ -26,7 +26,7 @@ export function handleError(error: unknown, requestId?: string, origin: string |
   return new Response(JSON.stringify(errorResponse), {
     status,
     headers: {
-      ...getCorsHeaders(origin),
+      ...corsHeaders,
       'Content-Type': 'application/json',
     },
   });

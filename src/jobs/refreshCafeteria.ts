@@ -65,7 +65,7 @@ function scheduleNextRun(): NodeJS.Timeout {
 
   logger.info(`Next refresh: ${nextRunDate.toLocaleString()}`);
 
-  return setTimeout(async () => {
+  return <NodeJS.Timeout>setTimeout(async () => {
     try {
       await refreshCafeteriaData();
     } catch (error) {

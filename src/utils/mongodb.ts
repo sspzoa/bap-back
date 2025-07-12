@@ -71,9 +71,9 @@ class MongoDBService {
           $set: {
             data,
             documentId,
-            updatedAt: now,
-          },
-        },
+            updatedAt: now
+          }
+        }
       );
       logger.info(`Updated meal data: ${date}`);
     } else {
@@ -82,7 +82,7 @@ class MongoDBService {
         data,
         documentId,
         createdAt: now,
-        updatedAt: now,
+        updatedAt: now
       });
       logger.info(`Saved meal data: ${date}`);
     }
@@ -101,7 +101,10 @@ class MongoDBService {
     const collection = this.getMealDataCollection();
     const totalMealData = await collection.countDocuments();
 
-    const lastDocument = await collection.findOne({}, { sort: { updatedAt: -1 } });
+    const lastDocument = await collection.findOne(
+      {},
+      { sort: { updatedAt: -1 } }
+    );
 
     return {
       totalMealData,
