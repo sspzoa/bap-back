@@ -213,7 +213,7 @@ export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: Me
     const targetDate = new Date(dateParam);
 
     const postDates = menuPosts
-      .map(post => parseKoreanDate(post.title))
+      .map((post) => parseKoreanDate(post.title))
       .filter((date): date is Date => date !== null)
       .sort((a, b) => a.getTime() - b.getTime());
 
