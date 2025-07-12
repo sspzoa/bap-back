@@ -1,3 +1,12 @@
+function validateConfig() {
+  const required = ['MONGODB_URI'];
+  const missing = required.filter((key) => !process.env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
+
 export const CONFIG = {
   SERVER: {
     PORT: Number.parseInt(process.env.PORT || '3000', 10),
@@ -24,3 +33,5 @@ export const CONFIG = {
     },
   },
 } as const;
+
+validateConfig();

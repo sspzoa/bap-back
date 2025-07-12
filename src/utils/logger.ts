@@ -10,14 +10,14 @@ interface LogContext {
   operation?: string;
   date?: string;
   duration?: number;
-  [key: string]: any;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 const LOG_LEVEL = (process.env.LOG_LEVEL as keyof typeof LogLevel) || 'INFO';
 const CURRENT_LEVEL = LogLevel[LOG_LEVEL] || LogLevel.INFO;
 
 function generateRequestId(): string {
-  return Math.random().toString(36).substr(2, 8);
+  return Math.random().toString(36).substring(2, 10);
 }
 
 function formatMessage(level: string, message: string, context?: LogContext): string {
@@ -49,28 +49,28 @@ export class Logger {
     return new Logger({ ...this.context, ...additionalContext });
   }
 
-  debug(message: string, data?: any): void {
+  debug(message: string, data?: unknown): void {
     if (CURRENT_LEVEL <= LogLevel.DEBUG) {
       const extra = data ? ` ${JSON.stringify(data)}` : '';
       console.debug(formatMessage('DEBUG', message + extra, this.context));
     }
   }
 
-  info(message: string, data?: any): void {
+  info(message: string, data?: unknown): void {
     if (CURRENT_LEVEL <= LogLevel.INFO) {
       const extra = data ? ` ${JSON.stringify(data)}` : '';
       console.info(formatMessage('INFO', message + extra, this.context));
     }
   }
 
-  warn(message: string, data?: any): void {
+  warn(message: string, data?: unknown): void {
     if (CURRENT_LEVEL <= LogLevel.WARN) {
       const extra = data ? ` ${JSON.stringify(data)}` : '';
       console.warn(formatMessage('WARN', message + extra, this.context));
     }
   }
 
-  error(message: string, error?: any): void {
+  error(message: string, error?: unknown): void {
     if (CURRENT_LEVEL <= LogLevel.ERROR) {
       const errorStr =
         error instanceof Error

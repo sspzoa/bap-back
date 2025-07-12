@@ -1,14 +1,14 @@
 import { serve } from 'bun';
 import { CONFIG } from './config';
 import { setupRefreshJob } from './jobs/refreshCafeteria';
-import { corsHeaders, handleCors } from './middleware/cors';
+import { getCorsHeaders, handleCors } from './middleware/cors';
 import { ApiError, handleError } from './middleware/error';
 import { handleCafeteriaRequest, handleHealthCheck } from './routes';
 import { logger } from './utils/logger';
 import { mongoDB } from './utils/mongodb';
 
 function generateRequestId(): string {
-  return Math.random().toString(36).substr(2, 8);
+  return Math.random().toString(36).substring(2, 10);
 }
 
 export async function createServer() {
@@ -29,7 +29,7 @@ export async function createServer() {
         const method = req.method;
 
         const requestLogger = logger.request(method, path);
-        const requestId = requestLogger.context.requestId || generateRequestId();
+        const requestId = requestLogger.context?.requestId || generateRequestId();
         const startTime = Date.now();
 
         try {
@@ -42,8 +42,10 @@ export async function createServer() {
           let response: Response;
 
           if (path === '/health') {
-            response = await handleHealthCheck(requestId);
+            const origin = req.headers.get('Origin');
+            response = await handleHealthCheck(requestId, origin);
           } else if (path === '/') {
+            const origin = req.headers.get('Origin');
             response = new Response(
               JSON.stringify({
                 requestId,
@@ -52,7 +54,7 @@ export async function createServer() {
               }),
               {
                 headers: {
-                  ...corsHeaders,
+                  ...getCorsHeaders(origin),
                   'Content-Type': 'application/json',
                 },
               },
@@ -60,7 +62,8 @@ export async function createServer() {
           } else {
             const dateMatch = path.match(/^\/(\d{4}-\d{2}-\d{2})$/);
             if (dateMatch) {
-              response = await handleCafeteriaRequest(dateMatch[1], requestId);
+              const origin = req.headers.get('Origin');
+              response = await handleCafeteriaRequest(dateMatch[1], requestId, origin);
             } else {
               throw new ApiError(404, 'Endpoint not found');
             }
@@ -71,7 +74,8 @@ export async function createServer() {
         } catch (error) {
           const duration = Date.now() - startTime;
           requestLogger.error(`Request failed after ${duration}ms`, error);
-          return handleError(error, requestId);
+          const origin = req.headers.get('Origin');
+          return handleError(error, requestId, origin);
         }
       },
     });

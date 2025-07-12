@@ -1,11 +1,11 @@
-import { corsHeaders } from '../middleware/cors';
+import { getCorsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
 import { getCafeteriaData } from '../services/cafeteria';
 import type { CafeteriaResponse, HealthCheckResponse } from '../types';
 import { isValidDate } from '../utils/date';
 import { mongoDB } from '../utils/mongodb';
 
-export async function handleHealthCheck(requestId: string): Promise<Response> {
+export async function handleHealthCheck(requestId: string, origin: string | null = null): Promise<Response> {
   const stats = await mongoDB.getStats();
 
   const response: HealthCheckResponse = {
@@ -21,13 +21,17 @@ export async function handleHealthCheck(requestId: string): Promise<Response> {
 
   return new Response(JSON.stringify(response), {
     headers: {
-      ...corsHeaders,
+      ...getCorsHeaders(origin),
       'Content-Type': 'application/json',
     },
   });
 }
 
-export async function handleCafeteriaRequest(dateParam: string, requestId: string): Promise<Response> {
+export async function handleCafeteriaRequest(
+  dateParam: string,
+  requestId: string,
+  origin: string | null = null,
+): Promise<Response> {
   if (!isValidDate(dateParam)) {
     throw new ApiError(400, 'Invalid date format');
   }
@@ -44,7 +48,7 @@ export async function handleCafeteriaRequest(dateParam: string, requestId: strin
 
     return new Response(JSON.stringify(response), {
       headers: {
-        ...corsHeaders,
+        ...getCorsHeaders(origin),
         'Content-Type': 'application/json',
       },
     });
