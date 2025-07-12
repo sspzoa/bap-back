@@ -2,7 +2,7 @@ import { Puppeteer, createPuppeteerCDPSession } from '@scrapeless-ai/sdk';
 import { CONFIG } from '../config';
 import { logger } from './logger';
 
-let browserInstance: import('puppeteer-core').Browser | null = null;
+let browserInstance: any = null;
 
 async function getBrowser() {
   if (!browserInstance) {
