@@ -1,4 +1,3 @@
-import { refreshCafeteriaData } from '../jobs/refreshCafeteria';
 import { getCorsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
 import { getCafeteriaData } from '../services/cafeteria';
@@ -61,30 +60,6 @@ export async function handleCafeteriaRequest(
       if (error.message === 'NO_INFORMATION' || error.message.includes('not found')) {
         throw new ApiError(404, '급식 정보가 없어요');
       }
-    }
-    throw error;
-  }
-}
-
-export async function handleRefreshRequest(requestId: string, origin: string | null = null): Promise<Response> {
-  try {
-    await refreshCafeteriaData();
-
-    const response = {
-      requestId,
-      timestamp: new Date().toISOString(),
-      message: 'Cafeteria data refreshed successfully',
-    };
-
-    return new Response(JSON.stringify(response), {
-      headers: {
-        ...getCorsHeaders(origin),
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new ApiError(500, `Refresh failed: ${error.message}`);
     }
     throw error;
   }
