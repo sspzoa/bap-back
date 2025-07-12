@@ -173,6 +173,23 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       dinner: processedMenu.dinner,
     };
 
+    const isAllMealsEmpty =
+      processedMenu.breakfast.regular.length === 0 &&
+      processedMenu.breakfast.simple.length === 0 &&
+      processedMenu.lunch.regular.length === 0 &&
+      processedMenu.lunch.simple.length === 0 &&
+      processedMenu.dinner.regular.length === 0 &&
+      processedMenu.dinner.simple.length === 0;
+
+    if (isAllMealsEmpty) {
+      const existingData = await mongoDB.getMealData(dateKey);
+      if (existingData) {
+        mealLogger.info('All meals are empty, preserving existing data');
+        timer('Preserved existing meal data (empty refresh result)');
+        return existingData;
+      }
+    }
+
     await mongoDB.saveMealData(dateKey, result, documentId);
     timer('Parsed and saved meal data');
 
