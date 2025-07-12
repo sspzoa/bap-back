@@ -1,6 +1,6 @@
+import { refreshCafeteriaData } from '../jobs/refreshCafeteria';
 import { getCorsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
-import { refreshCafeteriaData } from '../jobs/refreshCafeteria';
 import { getCafeteriaData } from '../services/cafeteria';
 import type { CafeteriaResponse, HealthCheckResponse } from '../types';
 import { isValidDate } from '../utils/date';
@@ -69,11 +69,11 @@ export async function handleCafeteriaRequest(
 export async function handleRefreshRequest(requestId: string, origin: string | null = null): Promise<Response> {
   try {
     await refreshCafeteriaData();
-    
+
     const response = {
       requestId,
       timestamp: new Date().toISOString(),
-      message: 'Cafeteria data refreshed successfully'
+      message: 'Cafeteria data refreshed successfully',
     };
 
     return new Response(JSON.stringify(response), {
