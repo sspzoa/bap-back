@@ -66,7 +66,7 @@ const parseMenu = (menuStr: string): string[] => {
       parenDepth++;
       current += char;
     } else if (char === ')') {
-      parenDepth--;
+      parenDepth = Math.max(0, parenDepth - 1);
       current += char;
     } else if (char === '/' && parenDepth === 0) {
       if (current.trim()) {
