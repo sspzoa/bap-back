@@ -53,6 +53,7 @@ export const CONFIG = {
       { day: 5, hour: 7 },
       { day: 5, hour: 12 },
       { day: 5, hour: 18 },
+      { day: 6, hour: 3 },
       { day: 6, hour: 7 },
       { day: 6, hour: 12 },
       { day: 6, hour: 18 },
