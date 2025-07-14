@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import { fetchAndSaveCafeteriaData, getLatestMenuPosts } from '../services/cafeteria';
 import { formatDate, parseKoreanDate } from '../utils/date';
 import { closeBrowser } from '../utils/fetch';
@@ -44,19 +45,31 @@ export async function refreshCafeteriaData(): Promise<void> {
 
 function getNextRunTime(): number {
   const now = new Date();
-  const targetDay = 6;
-  const targetHour = 3;
+  const schedules = CONFIG.REFRESH.SCHEDULE;
+  let nextRunTime = Number.MAX_SAFE_INTEGER;
 
-  const next = new Date(now);
-  const currentDay = now.getDay();
-  const daysUntilSaturday = (targetDay - currentDay + 7) % 7;
+  for (const schedule of schedules) {
+    const next = new Date(now);
+    const currentDay = now.getDay();
+    const targetDay = schedule.day;
+    const targetHour = schedule.hour;
 
-  if (currentDay !== targetDay || now.getHours() >= targetHour) {
-    next.setDate(next.getDate() + (daysUntilSaturday || 7));
+    const daysUntilTarget = (targetDay - currentDay + 7) % 7;
+
+    if (currentDay === targetDay && now.getHours() < targetHour) {
+      next.setHours(targetHour, 0, 0, 0);
+    } else {
+      next.setDate(next.getDate() + (daysUntilTarget || 7));
+      next.setHours(targetHour, 0, 0, 0);
+    }
+
+    const timeUntilNext = next.getTime() - now.getTime();
+    if (timeUntilNext < nextRunTime) {
+      nextRunTime = timeUntilNext;
+    }
   }
 
-  next.setHours(targetHour, 0, 0, 0);
-  return next.getTime() - now.getTime();
+  return nextRunTime;
 }
 
 function scheduleNextRun(): NodeJS.Timeout {
@@ -77,7 +90,10 @@ function scheduleNextRun(): NodeJS.Timeout {
 }
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
-  logger.info('Setting up weekly refresh job (Saturday 3AM)');
+  const schedules = CONFIG.REFRESH.SCHEDULE;
+  const scheduleInfo = schedules.map((s) => `day ${s.day} at ${s.hour}:00`).join(', ');
+
+  logger.info(`Setting up refresh job: ${scheduleInfo}`);
 
   refreshCafeteriaData().catch((error) => {
     logger.error('Initial refresh failed', error);
