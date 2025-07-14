@@ -30,7 +30,7 @@ export class HttpError extends Error {
   }
 }
 
-async function fetchWithTimeout(
+async function fetchWithPuppeteer(
   url: string,
   options: RequestInit & { timeout?: number; solveCaptcha?: boolean } = {},
 ): Promise<Response> {
@@ -80,6 +80,45 @@ async function fetchWithTimeout(
   }
 }
 
+async function fetchWithNative(url: string, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
+  const { timeout = 30000, ...fetchOptions } = options;
+  const fetchLogger = logger.operation('fetch');
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`, url);
+    }
+
+    return response;
+  } catch (error) {
+    fetchLogger.error(`Fetch failed: ${url}`, error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new HttpError(408, 'Request timeout', url);
+    }
+    throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`, url);
+  }
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit & { timeout?: number; solveCaptcha?: boolean } = {},
+): Promise<Response> {
+  if (CONFIG.HTTP.USE_PUPPETEER) {
+    return fetchWithPuppeteer(url, options);
+  }
+  return fetchWithNative(url, options);
+}
+
 export async function fetchWithRetry<T>(
   url: string,
   options: RequestInit & {
@@ -109,7 +148,10 @@ export async function fetchWithRetry<T>(
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
-      const response = await fetchWithTimeout(url, { ...fetchOptions, solveCaptcha });
+      const response = await fetchWithTimeout(url, {
+        ...fetchOptions,
+        solveCaptcha: CONFIG.HTTP.USE_PUPPETEER ? solveCaptcha : false,
+      });
       return await parser(response);
     } catch (error) {
       lastError = error as Error;
