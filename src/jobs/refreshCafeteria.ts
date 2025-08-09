@@ -53,14 +53,15 @@ function getNextRunTime(): number {
     const currentDay = now.getDay();
     const targetDay = schedule.day;
     const targetHour = schedule.hour;
+    const targetMinute = schedule.minute;
 
     const daysUntilTarget = (targetDay - currentDay + 7) % 7;
 
-    if (currentDay === targetDay && now.getHours() < targetHour) {
-      next.setHours(targetHour, 0, 0, 0);
+    if (currentDay === targetDay && (now.getHours() < targetHour || (now.getHours() === targetHour && now.getMinutes() < targetMinute))) {
+      next.setHours(targetHour, targetMinute, 0, 0);
     } else {
       next.setDate(next.getDate() + (daysUntilTarget || 7));
-      next.setHours(targetHour, 0, 0, 0);
+      next.setHours(targetHour, targetMinute, 0, 0);
     }
 
     const timeUntilNext = next.getTime() - now.getTime();
@@ -91,7 +92,7 @@ function scheduleNextRun(): NodeJS.Timeout {
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
   const schedules = CONFIG.REFRESH.SCHEDULE;
-  const scheduleInfo = schedules.map((s) => `day ${s.day} at ${s.hour}:00`).join(', ');
+  const scheduleInfo = schedules.map((s) => `day ${s.day} at ${s.hour}:${s.minute.toString().padStart(2, '0')}`).join(', ');
 
   logger.info(`Setting up refresh job: ${scheduleInfo}`);
 
