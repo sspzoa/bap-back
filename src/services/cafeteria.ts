@@ -250,3 +250,13 @@ export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: Me
 
   return await getMealData(targetPost.documentId, dateParam);
 }
+
+export async function refreshSpecificDate(dateParam: string): Promise<CafeteriaData> {
+  const documentId = await mongoDB.getDocumentId(dateParam);
+  
+  if (!documentId) {
+    throw new Error('NO_INFORMATION');
+  }
+
+  return await getMealData(documentId, dateParam);
+}

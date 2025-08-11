@@ -120,6 +120,12 @@ class MongoDBService {
       latest: latest?._id || null,
     };
   }
+
+  async getDocumentId(date: string): Promise<string | null> {
+    const collection = this.getMealDataCollection();
+    const document = await collection.findOne({ _id: date }, { projection: { documentId: 1 } });
+    return document?.documentId || null;
+  }
 }
 
 export const mongoDB = new MongoDBService();

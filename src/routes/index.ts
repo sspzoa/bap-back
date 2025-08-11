@@ -1,6 +1,6 @@
 import { getCorsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
-import { getCafeteriaData } from '../services/cafeteria';
+import { getCafeteriaData, refreshSpecificDate } from '../services/cafeteria';
 import type { CafeteriaResponse, HealthCheckResponse } from '../types';
 import { isValidDate } from '../utils/date';
 import { mongoDB } from '../utils/mongodb';
@@ -57,6 +57,41 @@ export async function handleCafeteriaRequest(
       if (error.message === 'NO_OPERATION') {
         throw new ApiError(404, '급식 운영이 없어요');
       }
+      if (error.message === 'NO_INFORMATION' || error.message.includes('not found')) {
+        throw new ApiError(404, '급식 정보가 없어요');
+      }
+    }
+    throw error;
+  }
+}
+
+export async function handleRefreshRequest(
+  dateParam: string,
+  requestId: string,
+  origin: string | null = null,
+): Promise<Response> {
+  if (!isValidDate(dateParam)) {
+    throw new ApiError(400, 'Invalid date format');
+  }
+
+  try {
+    const data = await refreshSpecificDate(dateParam);
+
+    const response: CafeteriaResponse = {
+      requestId,
+      timestamp: new Date().toISOString(),
+      date: dateParam,
+      data,
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: {
+        ...getCorsHeaders(origin),
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error) {
       if (error.message === 'NO_INFORMATION' || error.message.includes('not found')) {
         throw new ApiError(404, '급식 정보가 없어요');
       }
