@@ -15,7 +15,10 @@ export function isValidDate(dateString: string): boolean {
 }
 
 export function parseKoreanDate(text: string): Date | null {
-  const match = text.match(/(\d+)월\s*(\d+)일/);
+  const normalizedText = text.replace(/[\uFF01-\uFF5E]/g, (char) =>
+    String.fromCharCode(char.charCodeAt(0) - 0xFEE0));
+  
+  const match = normalizedText.match(/(\d+)월\s*(\d+)일/);
   if (!match) return null;
 
   const [, month, day] = match;
