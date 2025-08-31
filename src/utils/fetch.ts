@@ -2,6 +2,15 @@ import { Puppeteer, createPuppeteerCDPSession } from '@scrapeless-ai/sdk';
 import { CONFIG } from '../config';
 import { logger } from './logger';
 
+function normalizeFullWidthCharacters(text: string): string {
+  return text
+    .replace(/[\uFF01-\uFF5E]/g, (char) => 
+      String.fromCharCode(char.charCodeAt(0) - 0xFEE0))
+    .replace(/\u3000/g, ' ')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"');
+}
+
 let browserInstance: import('puppeteer-core').Browser | null = null;
 
 async function getBrowser() {
@@ -57,6 +66,7 @@ async function fetchWithPuppeteer(
     }
 
     const content = await page.content();
+    const normalizedContent = normalizeFullWidthCharacters(content);
 
     return {
       ok: true,
@@ -64,10 +74,10 @@ async function fetchWithPuppeteer(
       statusText: 'OK',
       headers: new Headers(),
       url,
-      json: async () => JSON.parse(content),
-      text: async () => content,
-      blob: async () => new Blob([content]),
-      arrayBuffer: async () => new TextEncoder().encode(content).buffer,
+      json: async () => JSON.parse(normalizedContent),
+      text: async () => normalizedContent,
+      blob: async () => new Blob([normalizedContent]),
+      arrayBuffer: async () => new TextEncoder().encode(normalizedContent).buffer,
       clone: function () {
         return { ...this };
       },
@@ -165,6 +175,8 @@ export async function fetchWithRetry<T>(
   retryLogger.error(`All retries failed for ${url}`);
   throw lastError || new Error(`Failed to fetch ${url} after ${retries + 1} attempts`);
 }
+
+export { normalizeFullWidthCharacters };
 
 export async function closeBrowser() {
   if (browserInstance) {
