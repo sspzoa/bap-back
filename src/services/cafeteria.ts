@@ -119,7 +119,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       for (let i = startIndex + 1; i < lines.length; i++) {
         const line = lines[i];
 
-        if (line.startsWith('*조식:') || line.startsWith('*중식:') || line.startsWith('*석식:')) {
+        if (line.startsWith('*조식:' || '*조삭:') || line.startsWith('*중식:') || line.startsWith('*석식:')) {
           break;
         }
 
