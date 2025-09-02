@@ -119,7 +119,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       for (let i = startIndex + 1; i < lines.length; i++) {
         const line = lines[i];
 
-        if (line.startsWith('*조식:' || '*조삭:') || line.startsWith('*중식:') || line.startsWith('*석식:')) {
+        if (line.startsWith('*조식:') || line.startsWith('*조삭:') || line.startsWith('*중식:') || line.startsWith('*석식:')) {
           break;
         }
 
@@ -140,8 +140,9 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     for (let i = 0; i < contentLines.length; i++) {
       const line = contentLines[i];
 
-      if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
-        const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.BREAKFAST);
+      if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`) || line.startsWith('*조삭:')) {
+        const mealType = line.startsWith('*조삭:') ? '조삭' : CONFIG.MEAL_TYPES.BREAKFAST;
+        const { regular, simple } = parseMealSection(contentLines, i, mealType);
         processedMenu.breakfast.regular = regular;
         processedMenu.breakfast.simple = simple;
       } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
