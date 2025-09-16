@@ -4,12 +4,12 @@ import { formatDate, parseKoreanDate } from '../utils/date';
 import { closeBrowser } from '../utils/fetch';
 import { logger } from '../utils/logger';
 
-export async function refreshCafeteriaData(): Promise<void> {
+export async function refreshCafeteriaData(refreshType: 'today' | 'all' = 'all'): Promise<void> {
   const refreshLogger = logger.operation('refresh');
   const timer = refreshLogger.time();
 
   try {
-    refreshLogger.info('Starting cafeteria data refresh');
+    refreshLogger.info(`Starting cafeteria data refresh (${refreshType})`);
 
     const menuPosts = await getLatestMenuPosts();
     let successCount = 0;
@@ -23,6 +23,17 @@ export async function refreshCafeteriaData(): Promise<void> {
           continue;
         }
 
+        if (refreshType === 'today') {
+          const today = new Date();
+          const isToday = postDate.getDate() === today.getDate() &&
+                         postDate.getMonth() === today.getMonth() &&
+                         postDate.getFullYear() === today.getFullYear();
+
+          if (!isToday) {
+            continue;
+          }
+        }
+
         const dateKey = formatDate(postDate);
         refreshLogger.info(`Processing ${dateKey}`);
         await fetchAndSaveCafeteriaData(dateKey, menuPosts);
@@ -34,7 +45,7 @@ export async function refreshCafeteriaData(): Promise<void> {
       }
     }
 
-    timer(`Refresh completed: ${successCount} success, ${errorCount} errors`);
+    timer(`Refresh completed (${refreshType}): ${successCount} success, ${errorCount} errors`);
   } catch (error) {
     refreshLogger.error('Cafeteria refresh failed', error);
     throw error;
@@ -43,10 +54,11 @@ export async function refreshCafeteriaData(): Promise<void> {
   }
 }
 
-function getNextRunTime(): number {
+function getNextRunTime(): { timeMs: number; refreshType: 'today' | 'all' } {
   const now = new Date();
   const schedules = CONFIG.REFRESH.SCHEDULE;
   let nextRunTime = Number.MAX_SAFE_INTEGER;
+  let nextRefreshType: 'today' | 'all' = 'all';
 
   for (const schedule of schedules) {
     const next = new Date(now);
@@ -67,32 +79,33 @@ function getNextRunTime(): number {
     const timeUntilNext = next.getTime() - now.getTime();
     if (timeUntilNext < nextRunTime) {
       nextRunTime = timeUntilNext;
+      nextRefreshType = schedule.refreshType;
     }
   }
 
-  return nextRunTime;
+  return { timeMs: nextRunTime, refreshType: nextRefreshType };
 }
 
 function scheduleNextRun(): NodeJS.Timeout {
-  const timeUntilNext = getNextRunTime();
-  const nextRunDate = new Date(Date.now() + timeUntilNext);
+  const { timeMs, refreshType } = getNextRunTime();
+  const nextRunDate = new Date(Date.now() + timeMs);
 
-  logger.info(`Next refresh: ${nextRunDate.toLocaleString()}`);
+  logger.info(`Next refresh: ${nextRunDate.toLocaleString()} (${refreshType})`);
 
-  return setTimeout(async () => {
+  return <NodeJS.Timeout>setTimeout(async () => {
     try {
-      await refreshCafeteriaData();
+      await refreshCafeteriaData(refreshType);
     } catch (error) {
       logger.error('Scheduled refresh failed', error);
     } finally {
       scheduleNextRun();
     }
-  }, timeUntilNext);
+  }, timeMs);
 }
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
   const schedules = CONFIG.REFRESH.SCHEDULE;
-  const scheduleInfo = schedules.map((s) => `day ${s.day} at ${s.hour}:${s.minute.toString().padStart(2, '0')}`).join(', ');
+  const scheduleInfo = schedules.map((s) => `day ${s.day} at ${s.hour}:${s.minute.toString().padStart(2, '0')} (${s.refreshType})`).join(', ');
 
   logger.info(`Setting up refresh job: ${scheduleInfo}`);
 
