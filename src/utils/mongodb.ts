@@ -126,6 +126,40 @@ class MongoDBService {
     const document = await collection.findOne({ _id: date }, { projection: { documentId: 1 } });
     return document?.documentId || null;
   }
+
+  async searchLatestFoodImage(foodName: string): Promise<{
+    image: string;
+    date: string;
+    mealType: 'breakfast' | 'lunch' | 'dinner';
+  } | null> {
+    const collection = this.getMealDataCollection();
+
+    const documents = await collection
+      .find({}, { sort: { _id: -1 } })
+      .toArray();
+
+    for (const doc of documents) {
+      for (const mealType of ['breakfast', 'lunch', 'dinner'] as const) {
+        const meal = doc.data[mealType];
+
+        const hasFood = meal.regular.some(item =>
+          item.toLowerCase().includes(foodName.toLowerCase())
+        ) || meal.simple.some(item =>
+          item.toLowerCase().includes(foodName.toLowerCase())
+        );
+
+        if (hasFood && meal.image) {
+          return {
+            image: meal.image,
+            date: doc._id,
+            mealType,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
 }
 
 export const mongoDB = new MongoDBService();

@@ -99,3 +99,35 @@ export async function handleRefreshRequest(
     throw error;
   }
 }
+
+export async function handleFoodSearchRequest(
+  foodName: string,
+  requestId: string,
+  origin: string | null = null,
+): Promise<Response> {
+  try {
+    const latestImage = await mongoDB.searchLatestFoodImage(foodName);
+
+    if (!latestImage) {
+      throw new ApiError(404, '해당 메뉴를 찾을 수 없어요');
+    }
+
+    const response = {
+      requestId,
+      timestamp: new Date().toISOString(),
+      foodName,
+      image: latestImage.image,
+      date: latestImage.date,
+      mealType: latestImage.mealType,
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: {
+        ...getCorsHeaders(origin),
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    throw error;
+  }
+}
