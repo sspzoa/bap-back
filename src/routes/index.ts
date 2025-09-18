@@ -1,7 +1,7 @@
 import { getCorsHeaders } from '../middleware/cors';
 import { ApiError } from '../middleware/error';
 import { getCafeteriaData, refreshSpecificDate } from '../services/cafeteria';
-import type { CafeteriaResponse, HealthCheckResponse } from '../types';
+import type { CafeteriaResponse, FoodSearchResponse, HealthCheckResponse } from '../types';
 import { isValidDate } from '../utils/date';
 import { mongoDB } from '../utils/mongodb';
 
@@ -112,7 +112,7 @@ export async function handleFoodSearchRequest(
       throw new ApiError(404, '해당 메뉴를 찾을 수 없어요');
     }
 
-    const response = {
+    const response: FoodSearchResponse = {
       requestId,
       timestamp: new Date().toISOString(),
       foodName,

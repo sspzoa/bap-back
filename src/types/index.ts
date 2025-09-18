@@ -47,3 +47,12 @@ export interface MealDataDocument {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface FoodSearchResponse {
+  requestId: string;
+  timestamp: string;
+  foodName: string;
+  image: string;
+  date: string;
+  mealType: string;
+}
