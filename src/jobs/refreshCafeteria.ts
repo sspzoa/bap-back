@@ -1,6 +1,6 @@
 import { CONFIG } from '../config';
 import { fetchAndSaveCafeteriaData, getLatestMenuPosts } from '../services/cafeteria';
-import { formatDate, parseKoreanDate } from '../utils/date';
+import { formatDate } from '../utils/date';
 import { closeBrowser } from '../utils/fetch';
 import { logger } from '../utils/logger';
 
@@ -17,9 +17,9 @@ export async function refreshCafeteriaData(refreshType: 'today' | 'all' = 'all')
 
     for (const post of menuPosts) {
       try {
-        const postDate = parseKoreanDate(post.title);
-        if (!postDate) {
-          refreshLogger.warn(`Cannot parse date: ${post.title}`);
+        const postDate = new Date(post.date);
+        if (isNaN(postDate.getTime())) {
+          refreshLogger.warn(`Invalid date: ${post.date} for ${post.title}`);
           continue;
         }
 

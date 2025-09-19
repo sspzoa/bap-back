@@ -14,14 +14,30 @@ export function isValidDate(dateString: string): boolean {
   return !Number.isNaN(date.getTime());
 }
 
-export function parseKoreanDate(text: string): Date | null {
+export function parseKoreanDate(text: string, registrationDate?: string): Date | null {
   const normalizedText = text.replace(/[\uFF01-\uFF5E]/g, (char) =>
     String.fromCharCode(char.charCodeAt(0) - 0xFEE0));
-  
+
   const match = normalizedText.match(/(\d+)월\s*(\d+)일/);
   if (!match) return null;
 
   const [, month, day] = match;
-  const currentYear = new Date().getFullYear();
-  return new Date(currentYear, Number.parseInt(month) - 1, Number.parseInt(day));
+
+  let year: number;
+  if (registrationDate) {
+    const registrationYear = new Date(registrationDate).getFullYear();
+    const registrationMonth = new Date(registrationDate).getMonth() + 1;
+    const menuMonth = Number.parseInt(month);
+
+    // 12월에 업로드된 1월 메뉴의 경우 등록년도 + 1
+    if (registrationMonth === 12 && menuMonth === 1) {
+      year = registrationYear + 1;
+    } else {
+      year = registrationYear;
+    }
+  } else {
+    year = new Date().getFullYear();
+  }
+
+  return new Date(year, Number.parseInt(month) - 1, Number.parseInt(day));
 }

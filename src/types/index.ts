@@ -2,6 +2,7 @@ export interface MenuPost {
   documentId: string;
   title: string;
   date: string;
+  registrationDate: string;
 }
 
 export interface ProcessedMeal {

@@ -6,6 +6,29 @@ import { fetchWithRetry } from '../utils/fetch';
 import { logger } from '../utils/logger';
 import { mongoDB } from '../utils/mongodb';
 
+function calculateMenuDate(title: string, registrationDateStr: string): Date | null {
+  const monthDayMatch = title.match(/(\d{1,2})월\s*(\d{1,2})일/);
+  if (!monthDayMatch) return null;
+
+  const menuMonth = parseInt(monthDayMatch[1]);
+  const menuDay = parseInt(monthDayMatch[2]);
+
+  const registrationDate = new Date(registrationDateStr);
+  const registrationYear = registrationDate.getFullYear();
+  const registrationMonth = registrationDate.getMonth() + 1;
+
+  let menuYear = registrationYear;
+
+  if (registrationMonth === 12 && menuMonth === 1) {
+    menuYear = registrationYear + 1;
+  }
+  else if (registrationMonth === 1 && menuMonth === 12) {
+    menuYear = registrationYear - 1;
+  }
+
+  return new Date(menuYear, menuMonth - 1, menuDay);
+}
+
 export async function getLatestMenuPosts(): Promise<MenuPost[]> {
   const timer = logger.time();
 
@@ -18,23 +41,31 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
     });
 
     const $ = cheerio.load(html);
-    const posts = $('.scContent .scEllipsis a')
-      .map((_, element) => {
-        const link = $(element).attr('href');
+    const posts = $('.scContent tbody tr')
+      .map((_, row) => {
+        const linkElement = $(row).find('.scEllipsis a');
+        const link = linkElement.attr('href');
         const documentId = link?.match(/document_srl=(\d+)/)?.[1];
         if (!documentId) return null;
 
-        const title = $(element).text().trim();
+        const title = linkElement.text().trim();
         if (!title.includes('식단')) return null;
+
+        const registrationDate = $(row).find('td:nth-child(5)').text().trim();
+
+        const menuDate = calculateMenuDate(title, registrationDate);
+        if (!menuDate) return null;
 
         return {
           documentId,
           title,
-          date: $(element).closest('tr').find('td:nth-child(6)').text().trim(),
+          date: formatDate(menuDate),
+          registrationDate,
+          parsedDate: menuDate,
         };
       })
       .get()
-      .filter((post): post is MenuPost => post !== null);
+      .filter((post): post is MenuPost & { parsedDate: Date } => post !== null);
 
     timer(`Fetched ${posts.length} menu posts`);
     return posts;
@@ -46,9 +77,10 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
 
 function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost | undefined {
   const targetDate = new Date(dateParam);
+  const targetDateStr = formatDate(targetDate);
+
   return menuPosts.find((post) => {
-    const postDate = parseKoreanDate(post.title);
-    return postDate && formatDate(postDate) === formatDate(targetDate);
+    return post.date === targetDateStr;
   });
 }
 
@@ -119,7 +151,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       for (let i = startIndex + 1; i < lines.length; i++) {
         const line = lines[i];
 
-        if (line.startsWith('*조식:') || line.startsWith('*조삭:') || line.startsWith('*중식:') || line.startsWith('*석식:')) {
+        if (line.startsWith('*조식:') || line.startsWith('*중식:') || line.startsWith('*석식:')) {
           break;
         }
 
@@ -140,9 +172,8 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     for (let i = 0; i < contentLines.length; i++) {
       const line = contentLines[i];
 
-      if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`) || line.startsWith('*조삭:')) {
-        const mealType = line.startsWith('*조삭:') ? '조삭' : CONFIG.MEAL_TYPES.BREAKFAST;
-        const { regular, simple } = parseMealSection(contentLines, i, mealType);
+      if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
+        const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.BREAKFAST);
         processedMenu.breakfast.regular = regular;
         processedMenu.breakfast.simple = simple;
       } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
@@ -231,8 +262,8 @@ export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: Me
     const targetDate = new Date(dateParam);
 
     const postDates = menuPosts
-      .map((post) => parseKoreanDate(post.title))
-      .filter((date): date is Date => date !== null)
+      .map((post) => new Date(post.date))
+      .filter((date): date is Date => !isNaN(date.getTime()))
       .sort((a, b) => a.getTime() - b.getTime());
 
     if (postDates.length === 0) {
@@ -254,7 +285,7 @@ export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: Me
 
 export async function refreshSpecificDate(dateParam: string): Promise<CafeteriaData> {
   const documentId = await mongoDB.getDocumentId(dateParam);
-  
+
   if (!documentId) {
     throw new Error('NO_INFORMATION');
   }
