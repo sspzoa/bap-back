@@ -31,44 +31,50 @@ function calculateMenuDate(title: string, registrationDateStr: string): Date | n
 
 export async function getLatestMenuPosts(): Promise<MenuPost[]> {
   const timer = logger.time();
+  const allPosts: MenuPost[] = [];
 
   try {
-    const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}`;
+    for (let page = CONFIG.WEBSITE.PAGE_RANGE.START; page <= CONFIG.WEBSITE.PAGE_RANGE.END; page++) {
+      const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}&page=${page}`;
 
-    const html = await fetchWithRetry<string>(url, {
-      parser: async (response) => response.text(),
-      solveCaptcha: true,
-    });
+      const html = await fetchWithRetry<string>(url, {
+        parser: async (response) => response.text(),
+        solveCaptcha: true,
+      });
 
-    const $ = cheerio.load(html);
-    const posts = $('.scContent tbody tr')
-      .map((_, row) => {
-        const linkElement = $(row).find('.scEllipsis a');
-        const link = linkElement.attr('href');
-        const documentId = link?.match(/document_srl=(\d+)/)?.[1];
-        if (!documentId) return null;
+      const $ = cheerio.load(html);
+      const posts = $('.scContent tbody tr')
+        .map((_, row) => {
+          const linkElement = $(row).find('.scEllipsis a');
+          const link = linkElement.attr('href');
+          const documentId = link?.match(/document_srl=(\d+)/)?.[1];
+          if (!documentId) return null;
 
-        const title = linkElement.text().trim();
-        if (!title.includes('식단')) return null;
+          const title = linkElement.text().trim();
+          if (!title.includes('식단')) return null;
 
-        const registrationDate = $(row).find('td:nth-child(5)').text().trim();
+          const registrationDate = $(row).find('td:nth-child(5)').text().trim();
 
-        const menuDate = calculateMenuDate(title, registrationDate);
-        if (!menuDate) return null;
+          const menuDate = calculateMenuDate(title, registrationDate);
+          if (!menuDate) return null;
 
-        return {
-          documentId,
-          title,
-          date: formatDate(menuDate),
-          registrationDate,
-          parsedDate: menuDate,
-        };
-      })
-      .get()
-      .filter((post): post is MenuPost & { parsedDate: Date } => post !== null);
+          return {
+            documentId,
+            title,
+            date: formatDate(menuDate),
+            registrationDate,
+            parsedDate: menuDate,
+          };
+        })
+        .get()
+        .filter((post): post is MenuPost & { parsedDate: Date } => post !== null);
 
-    timer(`Fetched ${posts.length} menu posts`);
-    return posts;
+      allPosts.push(...posts);
+      logger.info(`Fetched ${posts.length} menu posts from page ${page}`);
+    }
+
+    timer(`Fetched total ${allPosts.length} menu posts from pages ${CONFIG.WEBSITE.PAGE_RANGE.START}-${CONFIG.WEBSITE.PAGE_RANGE.END}`);
+    return allPosts;
   } catch (error) {
     logger.error('Failed to fetch menu posts', error);
     throw error;

@@ -15,6 +15,10 @@ export const CONFIG = {
   WEBSITE: {
     BASE_URL: 'https://www.dimigo.hs.kr/index.php',
     CAFETERIA_PATH: 'school_cafeteria',
+    PAGE_RANGE: {
+      START: 1,
+      END: 1,
+    },
   },
   MEAL_TYPES: {
     BREAKFAST: '조식',
