@@ -56,4 +56,5 @@ export interface FoodSearchResponse {
   image: string;
   date: string;
   mealType: string;
+  similarity?: number;
 }
