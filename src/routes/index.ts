@@ -119,7 +119,6 @@ export async function handleFoodSearchRequest(
       image: latestImage.image,
       date: latestImage.date,
       mealType: latestImage.mealType,
-      similarity: latestImage.similarity,
     };
 
     return new Response(JSON.stringify(response), {

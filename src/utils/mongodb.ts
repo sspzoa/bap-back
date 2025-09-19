@@ -2,7 +2,6 @@ import { type Collection, type Db, MongoClient } from 'mongodb';
 import { CONFIG } from '../config';
 import type { CafeteriaData, MealDataDocument } from '../types';
 import { logger } from './logger';
-import { findBestMatches, isFlexibleMatch } from './search';
 
 class MongoDBService {
   private client: MongoClient | null = null;
@@ -132,7 +131,6 @@ class MongoDBService {
     image: string;
     date: string;
     mealType: 'breakfast' | 'lunch' | 'dinner';
-    similarity?: number;
   } | null> {
     const collection = this.getMealDataCollection();
 
@@ -140,56 +138,27 @@ class MongoDBService {
       .find({}, { sort: { _id: -1 } })
       .toArray();
 
-    let bestMatch: {
-      image: string;
-      date: string;
-      mealType: 'breakfast' | 'lunch' | 'dinner';
-      similarity: number;
-    } | null = null;
-
     for (const doc of documents) {
       for (const mealType of ['breakfast', 'lunch', 'dinner'] as const) {
         const meal = doc.data[mealType];
 
-        if (!meal.image) continue;
-
-        const allItems = [...meal.regular, ...meal.simple];
-        const matches = findBestMatches(
-          foodName,
-          allItems,
-          (item) => item,
-          0.6,
-          1
-        );
-
-        if (matches.length > 0) {
-          const match = matches[0];
-          if (!bestMatch || match.similarity > bestMatch.similarity) {
-            bestMatch = {
-              image: meal.image,
-              date: doc._id,
-              mealType,
-              similarity: match.similarity,
-            };
-          }
-        }
-
-        const exactMatch = allItems.some(item =>
+        const hasFood = meal.regular.some(item =>
+          item.toLowerCase().includes(foodName.toLowerCase())
+        ) || meal.simple.some(item =>
           item.toLowerCase().includes(foodName.toLowerCase())
         );
 
-        if (exactMatch && (!bestMatch || bestMatch.similarity < 0.9)) {
-          bestMatch = {
+        if (hasFood && meal.image) {
+          return {
             image: meal.image,
             date: doc._id,
             mealType,
-            similarity: 0.95,
           };
         }
       }
     }
 
-    return bestMatch;
+    return null;
   }
 }
 
