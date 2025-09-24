@@ -40,34 +40,40 @@ export const CONFIG = {
   REFRESH: {
     SCHEDULE: [
       // 주말 (일요일)
+      { day: 0, hour: 3, minute: 0, refreshType: 'all' },
       { day: 0, hour: 7, minute: 0, refreshType: 'today' },
-      { day: 0, hour: 12, minute: 0, refreshType: 'today' },
-      { day: 0, hour: 18, minute: 0, refreshType: 'today' },
+      { day: 0, hour: 11, minute: 50, refreshType: 'today' },
+      { day: 0, hour: 17, minute: 50, refreshType: 'today' },
       // 평일 (월요일)
+      { day: 1, hour: 3, minute: 0, refreshType: 'all' },
       { day: 1, hour: 6, minute: 30, refreshType: 'today' },
-      { day: 1, hour: 12, minute: 50, refreshType: 'today' },
-      { day: 1, hour: 18, minute: 30, refreshType: 'today' },
+      { day: 1, hour: 12, minute: 40, refreshType: 'today' },
+      { day: 1, hour: 18, minute: 20, refreshType: 'today' },
       // 평일 (화요일)
+      { day: 2, hour: 3, minute: 0, refreshType: 'all' },
       { day: 2, hour: 6, minute: 30, refreshType: 'today' },
-      { day: 2, hour: 12, minute: 50, refreshType: 'today' },
-      { day: 2, hour: 18, minute: 30, refreshType: 'today' },
+      { day: 2, hour: 12, minute: 40, refreshType: 'today' },
+      { day: 2, hour: 18, minute: 20, refreshType: 'today' },
       // 평일 (수요일)
+      { day: 3, hour: 3, minute: 0, refreshType: 'all' },
       { day: 3, hour: 6, minute: 30, refreshType: 'today' },
-      { day: 3, hour: 12, minute: 50, refreshType: 'today' },
-      { day: 3, hour: 18, minute: 30, refreshType: 'today' },
+      { day: 3, hour: 12, minute: 40, refreshType: 'today' },
+      { day: 3, hour: 18, minute: 20, refreshType: 'today' },
       // 평일 (목요일)
+      { day: 4, hour: 3, minute: 0, refreshType: 'all' },
       { day: 4, hour: 6, minute: 30, refreshType: 'today' },
-      { day: 4, hour: 12, minute: 50, refreshType: 'today' },
-      { day: 4, hour: 18, minute: 30, refreshType: 'today' },
+      { day: 4, hour: 12, minute: 40, refreshType: 'today' },
+      { day: 4, hour: 18, minute: 20, refreshType: 'today' },
       // 평일 (금요일)
+      { day: 5, hour: 3, minute: 0, refreshType: 'all' },
       { day: 5, hour: 6, minute: 30, refreshType: 'today' },
-      { day: 5, hour: 12, minute: 50, refreshType: 'today' },
-      { day: 5, hour: 18, minute: 30, refreshType: 'today' },
+      { day: 5, hour: 12, minute: 40, refreshType: 'today' },
+      { day: 5, hour: 18, minute: 20, refreshType: 'today' },
       // 주말 (토요일)
       { day: 6, hour: 3, minute: 0, refreshType: 'all' },
       { day: 6, hour: 7, minute: 0, refreshType: 'today' },
-      { day: 6, hour: 12, minute: 0, refreshType: 'today' },
-      { day: 6, hour: 18, minute: 0, refreshType: 'today' }
+      { day: 6, hour: 11, minute: 50, refreshType: 'today' },
+      { day: 6, hour: 17, minute: 50, refreshType: 'today' }
     ],
   },
 } as const;
