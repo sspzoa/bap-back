@@ -58,7 +58,7 @@ jobs:
           docker stop ${{ env.NAME }} || true
           docker rm ${{ env.NAME }} || true
           docker rmi ${{ env.DOCKER_IMAGE }}:latest || true
-          docker run -d -p 3002:3000 --name ${{ env.NAME }} --restart always \
+          docker run -d -p 3001:3000 --name ${{ env.NAME }} --restart always \
             -e SCRAPELESS_API_KEY=${{ secrets.SCRAPELESS_API_KEY }} \
             -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
             -e MONGODB_DB_NAME=${{ secrets.MONGODB_DB_NAME }} \
