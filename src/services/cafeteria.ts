@@ -148,14 +148,14 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     };
 
     const parseMealSection = (lines: string[], startIndex: number, mealType: string) => {
-      const mealLine = lines[startIndex].replaceAll(" ", "");
+      const mealLine = lines[startIndex].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
       const mealText = mealLine.replace(`*${mealType}:`, '').trim();
 
       const regular = parseMenu(mealText);
       let simple: string[] = [];
 
       for (let i = startIndex + 1; i < lines.length; i++) {
-        const line = lines[i];
+        const line = lines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
 
         if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`) || 
             line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`) || 
