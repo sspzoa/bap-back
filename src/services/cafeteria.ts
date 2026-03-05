@@ -178,17 +178,17 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     };
 
     for (let i = 0; i < contentLines.length; i++) {
-      const line = contentLines[i];
+      const line = contentLines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
 
-      if (line.replaceAll(" ", "").startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
+      if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
         const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.BREAKFAST);
         processedMenu.breakfast.regular = regular;
         processedMenu.breakfast.simple = simple;
-      } else if (line.replaceAll(" ", "").startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
+      } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
         const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.LUNCH);
         processedMenu.lunch.regular = regular;
         processedMenu.lunch.simple = simple;
-      } else if (line.replaceAll(" ", "").startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)) {
+      } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)) {
         const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.DINNER);
         processedMenu.dinner.regular = regular;
         processedMenu.dinner.simple = simple;
