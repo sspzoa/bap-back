@@ -11,9 +11,10 @@ function normalizeFullWidthCharacters(text: string): string {
     .replace(/[\u201C\u201D]/g, '"');
 }
 
-let browserInstance: import('puppeteer-core').Browser | null = null;
+type BrowserInstance = Awaited<ReturnType<typeof Puppeteer.connect>>;
+let browserInstance: BrowserInstance | null = null;
 
-async function getBrowser() {
+async function getBrowser(): Promise<BrowserInstance> {
   if (!browserInstance) {
     logger.info('Creating browser instance');
     browserInstance = await Puppeteer.connect({
@@ -41,31 +42,52 @@ export class HttpError extends Error {
 
 async function fetchWithPuppeteer(
   url: string,
-  options: RequestInit & { timeout?: number; solveCaptcha?: boolean } = {},
+  options: RequestInit & { method?: string; timeout?: number; solveCaptcha?: boolean; body?: any } = {},
 ): Promise<Response> {
-  const { solveCaptcha = false } = options;
+  const { solveCaptcha = false, body } = options;
+  const isPost = (options.method || 'GET').toUpperCase() === 'POST';
   const browser = await getBrowser();
   const page = await browser.newPage();
   const fetchLogger = logger.operation('fetch');
 
   try {
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    let content: string;
 
-    if (solveCaptcha) {
-      try {
-        const cdpSession = await createPuppeteerCDPSession(page);
-        await cdpSession.waitCaptchaDetected();
-        fetchLogger.info('Solving captcha');
-        await cdpSession.solveCaptcha();
-        await cdpSession.waitCaptchaSolved();
-        fetchLogger.info('Captcha solved');
-        await page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {});
-      } catch {
-        // No captcha detected
+    if (isPost) {
+      content = await page.evaluate(
+        async (fetchUrl: string, fetchBody: string, fetchHeaders: Record<string, string>) => {
+          const res = await fetch(fetchUrl, {
+            method: 'POST',
+            body: fetchBody,
+            headers: fetchHeaders,
+          });
+          return res.text();
+        },
+        url,
+        (options.body as string) || '',
+        (options.headers as Record<string, string>) || {},
+      );
+    } else {
+      await page.goto(url, { waitUntil: 'networkidle2' });
+
+      if (solveCaptcha) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const cdpSession = await createPuppeteerCDPSession(page as any);
+          await cdpSession.waitCaptchaDetected();
+          fetchLogger.info('Solving captcha');
+          await cdpSession.solveCaptcha();
+          await cdpSession.waitCaptchaSolved();
+          fetchLogger.info('Captcha solved');
+          await page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {});
+        } catch {
+          // No captcha detected
+        }
       }
+
+      content = await page.content();
     }
 
-    const content = await page.content();
     const normalizedContent = normalizeFullWidthCharacters(content);
 
     return {
@@ -90,7 +112,7 @@ async function fetchWithPuppeteer(
   }
 }
 
-async function fetchWithNative(url: string, options: RequestInit & { timeout?: number } = {}): Promise<Response> {
+async function fetchWithNative(url: string, options: RequestInit & { method?: string; timeout?: number; body?: any } = {}): Promise<Response> {
   const { timeout = 30000, ...fetchOptions } = options;
   const fetchLogger = logger.operation('fetch');
 
@@ -99,6 +121,11 @@ async function fetchWithNative(url: string, options: RequestInit & { timeout?: n
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     const response = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      },
+      body: options.body,
       ...fetchOptions,
       signal: controller.signal,
     });
@@ -121,7 +148,7 @@ async function fetchWithNative(url: string, options: RequestInit & { timeout?: n
 
 async function fetchWithTimeout(
   url: string,
-  options: RequestInit & { timeout?: number; solveCaptcha?: boolean } = {},
+  options: RequestInit & { method?: string; timeout?: number; solveCaptcha?: boolean; body?: any } = {},
 ): Promise<Response> {
   if (CONFIG.HTTP.USE_PUPPETEER) {
     return fetchWithPuppeteer(url, options);
@@ -132,11 +159,13 @@ async function fetchWithTimeout(
 export async function fetchWithRetry<T>(
   url: string,
   options: RequestInit & {
+    method?: string;
     timeout?: number;
     retries?: number;
     baseDelay?: number;
     solveCaptcha?: boolean;
     parser?: (response: Response) => Promise<T>;
+    body?: any;
   } = {},
 ): Promise<T> {
   const {

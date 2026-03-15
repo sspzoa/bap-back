@@ -35,25 +35,30 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
 
   try {
     for (let page = CONFIG.WEBSITE.PAGE_RANGE.START; page <= CONFIG.WEBSITE.PAGE_RANGE.END; page++) {
-      const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}&page=${page}`;
+      const url = `${CONFIG.WEBSITE.BASE_URL}/${CONFIG.WEBSITE.LIST_PATH}`;
 
       const html = await fetchWithRetry<string>(url, {
+        method: 'POST',
+        body: new URLSearchParams({
+          currPage: String(page),
+          mi: '13609',
+          bbsId: '6909',
+        }).toString(),
         parser: async (response) => response.text(),
         solveCaptcha: true,
       });
 
       const $ = cheerio.load(html);
-      const posts = $('.scContent tbody tr')
+      const posts = $('.BD_list tbody tr')
         .map((_, row) => {
-          const linkElement = $(row).find('.scEllipsis a');
-          const link = linkElement.attr('href');
-          const documentId = link?.match(/document_srl=(\d+)/)?.[1];
+          const linkElement = $(row).find('.ta_l a');
+          const documentId = linkElement.attr('data-id');
           if (!documentId) return null;
 
           const title = linkElement.text().trim();
           if (!title.includes('식단')) return null;
 
-          const registrationDate = $(row).find('td:nth-child(5)').text().trim();
+          const registrationDate = $(row).find('td:nth-child(4)').text().trim();
 
           const menuDate = calculateMenuDate(title, registrationDate);
           if (!menuDate) return null;
@@ -128,14 +133,15 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
   const timer = mealLogger.time();
 
   try {
-    const url = `${CONFIG.WEBSITE.BASE_URL}?mid=${CONFIG.WEBSITE.CAFETERIA_PATH}&document_srl=${documentId}`;
+    const url = `${CONFIG.WEBSITE.BASE_URL}/${CONFIG.WEBSITE.INFO_PATH}?mi=13609&bbsId=6909&nttSn=${documentId}`;
 
     const html = await fetchWithRetry<string>(url, {
+      method: 'POST',
       parser: async (response) => response.text(),
     });
 
     const $ = cheerio.load(html);
-    const contentLines = $('.xe_content')
+    const contentLines = $('.bbsV_cont')
       .text()
       .split('\n')
       .map((line) => line.trim())
@@ -195,12 +201,13 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       }
     }
 
-    $('.xe_content img').each((_, element) => {
+    $('.bbsV_cont img').each((_, element) => {
       const imgSrc = $(element).attr('src');
       const imgAlt = $(element).attr('alt')?.toLowerCase() || '';
 
       if (imgSrc) {
-        const fullUrl = new URL(imgSrc, 'https://www.dimigo.hs.kr').toString();
+        // const fullUrl = new URL(imgSrc, 'https://www.dimigo.hs.kr').toString();
+        const fullUrl = new URL(imgSrc).toString();
         if (imgAlt.includes('조')) processedMenu.breakfast.image = fullUrl;
         else if (imgAlt.includes('중')) processedMenu.lunch.image = fullUrl;
         else if (imgAlt.includes('석')) processedMenu.dinner.image = fullUrl;
