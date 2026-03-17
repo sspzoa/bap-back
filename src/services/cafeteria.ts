@@ -148,9 +148,9 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       .filter(Boolean);
 
     const processedMenu: ProcessedMealMenu = {
-      breakfast: { regular: [], simple: [], image: '' },
-      lunch: { regular: [], simple: [], image: '' },
-      dinner: { regular: [], simple: [], image: '' },
+      breakfast: { regular: [], simple: [], plus: [], image: '' },
+      lunch: { regular: [], simple: [], plus: [], image: '' },
+      dinner: { regular: [], simple: [], plus: [], image: '' },
     };
 
     const parseMealSection = (lines: string[], startIndex: number, mealType: string) => {
@@ -159,6 +159,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
 
       const regular = parseMenu(mealText);
       let simple: string[] = [];
+      let plus: string[] = [];
 
       for (let i = startIndex + 1; i < lines.length; i++) {
         const line = lines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
@@ -169,35 +170,52 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
           break;
         }
 
-        if (/^<간편식>\s*/.test(line)) {
-          const simpleMealText = line.replace(/^<간편식>\s*/, '').trim();
-          simple = parseMenu(simpleMealText);
+        
+        if (line.includes('<플러스바>')) {
+          const parts = line.split('<플러스바>');
+          if (parts.length > 1) {
+            const plusMealText = parts[1].trim();
+            plus = parseMenu(plusMealText);
+          }
+          continue;
+        }
+        
+        if (line.includes('<간편식>')) {
+          const parts = line.split('<간편식>');
+          if (parts.length > 1) {
+            const simpleMealText = parts[1].trim();
+            simple = parseMenu(simpleMealText);
+          }
+          continue;
         }
 
-        if (simple.length > 0 || line === '') {
+        if (simple.length > 0 || plus.length > 0 || line === '') {
           continue;
         }
         break;
       }
 
-      return { regular, simple };
+      return { regular, simple, plus };
     };
 
     for (let i = 0; i < contentLines.length; i++) {
       const line = contentLines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
 
       if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
-        const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.BREAKFAST);
+        const { regular, simple, plus } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.BREAKFAST);
         processedMenu.breakfast.regular = regular;
         processedMenu.breakfast.simple = simple;
+        processedMenu.breakfast.plus = plus;
       } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
-        const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.LUNCH);
+        const { regular, simple, plus } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.LUNCH);
         processedMenu.lunch.regular = regular;
         processedMenu.lunch.simple = simple;
+        processedMenu.lunch.plus = plus;
       } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)) {
-        const { regular, simple } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.DINNER);
+        const { regular, simple, plus } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.DINNER);
         processedMenu.dinner.regular = regular;
         processedMenu.dinner.simple = simple;
+        processedMenu.dinner.plus = plus;
       }
     }
 
@@ -223,10 +241,13 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     const isAllMealsEmpty =
       processedMenu.breakfast.regular.length === 0 &&
       processedMenu.breakfast.simple.length === 0 &&
+      processedMenu.breakfast.plus.length === 0 &&
       processedMenu.lunch.regular.length === 0 &&
       processedMenu.lunch.simple.length === 0 &&
+      processedMenu.lunch.plus.length === 0 &&
       processedMenu.dinner.regular.length === 0 &&
-      processedMenu.dinner.simple.length === 0;
+      processedMenu.dinner.simple.length === 0 &&
+      processedMenu.dinner.plus.length === 0;
 
     if (isAllMealsEmpty) {
       const existingData = await mongoDB.getMealData(dateKey);

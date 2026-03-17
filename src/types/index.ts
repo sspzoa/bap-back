@@ -8,6 +8,7 @@ export interface MenuPost {
 export interface ProcessedMeal {
   regular: string[];
   simple: string[];
+  plus: string[];
   image: string;
 }
 
