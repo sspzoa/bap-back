@@ -1,5 +1,5 @@
-import { logger } from '../utils/logger';
-import { getCorsHeaders } from './cors';
+import { getCorsHeaders } from "@/middleware/cors";
+import { logger } from "@/shared/lib/logger";
 
 export class ApiError extends Error {
   constructor(
@@ -8,17 +8,17 @@ export class ApiError extends Error {
     public readonly code?: string,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
 export function handleError(error: unknown, requestId?: string, origin: string | null = null): Response {
-  logger.error('Request error:', error);
+  logger.error("Request error:", error);
 
   const errorResponse = {
-    requestId: requestId || 'unknown',
+    requestId: requestId || "unknown",
     timestamp: new Date().toISOString(),
-    error: error instanceof ApiError ? error.message : 'Internal server error',
+    error: error instanceof ApiError ? error.message : "Internal server error",
   };
 
   const status = error instanceof ApiError ? error.status : 500;
@@ -27,7 +27,7 @@ export function handleError(error: unknown, requestId?: string, origin: string |
     status,
     headers: {
       ...getCorsHeaders(origin),
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 }

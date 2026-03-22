@@ -1,17 +1,17 @@
-import * as cheerio from 'cheerio';
-import { CONFIG } from '../config';
-import type { CafeteriaData, MenuPost, ProcessedMealMenu } from '../types';
-import { formatDate, parseKoreanDate } from '../utils/date';
-import { fetchWithRetry } from '../utils/fetch';
-import { logger } from '../utils/logger';
-import { mongoDB } from '../utils/mongodb';
+import * as cheerio from "cheerio";
+import { CONFIG } from "@/shared/lib/config";
+import { logger } from "@/shared/lib/logger";
+import { mongoDB } from "@/shared/lib/mongodb";
+import type { CafeteriaData, MenuPost, ProcessedMealMenu } from "@/shared/types";
+import { formatDate } from "@/shared/utils/date";
+import { fetchWithRetry } from "@/shared/utils/fetch";
 
 function calculateMenuDate(title: string, registrationDateStr: string): Date | null {
   const monthDayMatch = title.match(/(\d{1,2})월\s*(\d{1,2})일/);
   if (!monthDayMatch) return null;
 
-  const menuMonth = parseInt(monthDayMatch[1]);
-  const menuDay = parseInt(monthDayMatch[2]);
+  const menuMonth = parseInt(monthDayMatch[1], 10);
+  const menuDay = parseInt(monthDayMatch[2], 10);
 
   const registrationDate = new Date(registrationDateStr);
   const registrationYear = registrationDate.getFullYear();
@@ -21,8 +21,7 @@ function calculateMenuDate(title: string, registrationDateStr: string): Date | n
 
   if (registrationMonth === 12 && menuMonth === 1) {
     menuYear = registrationYear + 1;
-  }
-  else if (registrationMonth === 1 && menuMonth === 12) {
+  } else if (registrationMonth === 1 && menuMonth === 12) {
     menuYear = registrationYear - 1;
   }
 
@@ -38,27 +37,27 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
       const url = `${CONFIG.WEBSITE.BASE_URL}/${CONFIG.WEBSITE.LIST_PATH}`;
 
       const html = await fetchWithRetry<string>(url, {
-        method: 'POST',
+        method: "POST",
         body: new URLSearchParams({
           currPage: String(page),
-          mi: '13609',
-          bbsId: '6909',
+          mi: "13609",
+          bbsId: "6909",
         }).toString(),
         parser: async (response) => response.text(),
         solveCaptcha: true,
       });
 
       const $ = cheerio.load(html);
-      const posts = $('.BD_list tbody tr')
+      const posts = $(".BD_list tbody tr")
         .map((_, row) => {
-          const linkElement = $(row).find('.ta_l a');
-          const documentId = linkElement.attr('data-id');
+          const linkElement = $(row).find(".ta_l a");
+          const documentId = linkElement.attr("data-id");
           if (!documentId) return null;
 
           const title = linkElement.text().trim();
-          if (!title.includes('식단')) return null;
+          if (!title.includes("식단")) return null;
 
-          const registrationDate = $(row).find('td:nth-child(4)').text().trim();
+          const registrationDate = $(row).find("td:nth-child(4)").text().trim();
 
           const menuDate = calculateMenuDate(title, registrationDate);
           if (!menuDate) return null;
@@ -78,10 +77,12 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
       logger.info(`Fetched ${posts.length} menu posts from page ${page}`);
     }
 
-    timer(`Fetched total ${allPosts.length} menu posts from pages ${CONFIG.WEBSITE.PAGE_RANGE.START}-${CONFIG.WEBSITE.PAGE_RANGE.END}`);
+    timer(
+      `Fetched total ${allPosts.length} menu posts from pages ${CONFIG.WEBSITE.PAGE_RANGE.START}-${CONFIG.WEBSITE.PAGE_RANGE.END}`,
+    );
     return allPosts;
   } catch (error) {
-    logger.error('Failed to fetch menu posts', error);
+    logger.error("Failed to fetch menu posts", error);
     throw error;
   }
 }
@@ -99,23 +100,23 @@ const parseMenu = (menuStr: string): string[] => {
   if (!menuStr) return [];
 
   const items: string[] = [];
-  let current = '';
+  let current = "";
   let parenDepth = 0;
 
   for (let i = 0; i < menuStr.length; i++) {
     const char = menuStr[i];
 
-    if (char === '(') {
+    if (char === "(") {
       parenDepth++;
       current += char;
-    } else if (char === ')') {
+    } else if (char === ")") {
       parenDepth = Math.max(0, parenDepth - 1);
       current += char;
-    } else if (char === '/' && parenDepth === 0) {
+    } else if (char === "/" && parenDepth === 0) {
       if (current.trim()) {
         items.push(current.trim());
       }
-      current = '';
+      current = "";
     } else {
       current += char;
     }
@@ -129,33 +130,40 @@ const parseMenu = (menuStr: string): string[] => {
 };
 
 async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaData> {
-  const mealLogger = logger.operation('parse-meal', dateKey);
+  const mealLogger = logger.operation("parse-meal", dateKey);
   const timer = mealLogger.time();
 
   try {
     const url = `${CONFIG.WEBSITE.BASE_URL}/${CONFIG.WEBSITE.INFO_PATH}?mi=13609&bbsId=6909&nttSn=${documentId}`;
 
     const html = await fetchWithRetry<string>(url, {
-      method: 'POST',
+      method: "POST",
       parser: async (response) => response.text(),
     });
 
     const $ = cheerio.load(html);
-    const contentLines = $('.bbsV_cont')
-      .text()
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
+    const pElements = $(".bbsV_cont p");
+    const contentLines =
+      pElements.length > 0
+        ? pElements
+            .map((_, el) => $(el).text().trim())
+            .get()
+            .filter(Boolean)
+        : $(".bbsV_cont")
+            .text()
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean);
 
     const processedMenu: ProcessedMealMenu = {
-      breakfast: { regular: [], simple: [], plus: [], image: '' },
-      lunch: { regular: [], simple: [], plus: [], image: '' },
-      dinner: { regular: [], simple: [], plus: [], image: '' },
+      breakfast: { regular: [], simple: [], plus: [], image: "" },
+      lunch: { regular: [], simple: [], plus: [], image: "" },
+      dinner: { regular: [], simple: [], plus: [], image: "" },
     };
 
     const parseMealSection = (lines: string[], startIndex: number, mealType: string) => {
       const mealLine = lines[startIndex].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
-      const mealText = mealLine.replace(`*${mealType}:`, '').trim();
+      const mealText = mealLine.replace(`*${mealType}:`, "").trim();
 
       const regular = parseMenu(mealText);
       let simple: string[] = [];
@@ -164,24 +172,26 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       for (let i = startIndex + 1; i < lines.length; i++) {
         const line = lines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
 
-        if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`) || 
-            line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`) || 
-            line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)) {
+        if (
+          line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`) ||
+          line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`) ||
+          line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)
+        ) {
           break;
         }
 
-        
-        if (line.includes('<플러스바>')) {
-          const parts = line.split('<플러스바>');
+        if (line.includes("<셀프바>") || line.includes("<플러스바>")) {
+          const delimiter = line.includes("<셀프바>") ? "<셀프바>" : "<플러스바>";
+          const parts = line.split(delimiter);
           if (parts.length > 1) {
             const plusMealText = parts[1].trim();
             plus = parseMenu(plusMealText);
           }
           continue;
         }
-        
-        if (line.includes('<간편식>')) {
-          const parts = line.split('<간편식>');
+
+        if (line.includes("<간편식>")) {
+          const parts = line.split("<간편식>");
           if (parts.length > 1) {
             const simpleMealText = parts[1].trim();
             simple = parseMenu(simpleMealText);
@@ -189,7 +199,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
           continue;
         }
 
-        if (simple.length > 0 || plus.length > 0 || line === '') {
+        if (simple.length > 0 || plus.length > 0 || line === "") {
           continue;
         }
         break;
@@ -219,16 +229,15 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       }
     }
 
-    $('.bbsV_cont img').each((_, element) => {
-      const imgSrc = $(element).attr('src');
-      const imgAlt = $(element).attr('alt')?.toLowerCase() || '';
+    $(".bbsV_cont img").each((_, element) => {
+      const imgSrc = $(element).attr("src");
+      const imgAlt = $(element).attr("alt")?.toLowerCase() || "";
 
       if (imgSrc) {
-        // const fullUrl = new URL(imgSrc, 'https://www.dimigo.hs.kr').toString();
         const fullUrl = new URL(imgSrc).toString();
-        if (imgAlt.includes('조')) processedMenu.breakfast.image = fullUrl;
-        else if (imgAlt.includes('중')) processedMenu.lunch.image = fullUrl;
-        else if (imgAlt.includes('석')) processedMenu.dinner.image = fullUrl;
+        if (imgAlt.includes("조")) processedMenu.breakfast.image = fullUrl;
+        else if (imgAlt.includes("중")) processedMenu.lunch.image = fullUrl;
+        else if (imgAlt.includes("석")) processedMenu.dinner.image = fullUrl;
       }
     });
 
@@ -252,14 +261,14 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     if (isAllMealsEmpty) {
       const existingData = await mongoDB.getMealData(dateKey);
       if (existingData) {
-        mealLogger.info('All meals are empty, preserving existing data');
-        timer('Preserved existing meal data (empty refresh result)');
+        mealLogger.info("All meals are empty, preserving existing data");
+        timer("Preserved existing meal data (empty refresh result)");
         return existingData;
       }
     }
 
     await mongoDB.saveMealData(dateKey, result, documentId);
-    timer('Parsed and saved meal data');
+    timer("Parsed and saved meal data");
 
     return result;
   } catch (error) {
@@ -277,7 +286,7 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData
   const { earliest, latest } = await mongoDB.getDateRange();
 
   if (!earliest || !latest) {
-    throw new Error('NO_INFORMATION');
+    throw new Error("NO_INFORMATION");
   }
 
   const targetDate = new Date(dateParam);
@@ -285,10 +294,10 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData
   const latestDate = new Date(latest);
 
   if (targetDate < earliestDate || targetDate > latestDate) {
-    throw new Error('NO_INFORMATION');
+    throw new Error("NO_INFORMATION");
   }
 
-  throw new Error('NO_OPERATION');
+  throw new Error("NO_OPERATION");
 }
 
 export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: MenuPost[]): Promise<CafeteriaData> {
@@ -299,21 +308,21 @@ export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: Me
 
     const postDates = menuPosts
       .map((post) => new Date(post.date))
-      .filter((date): date is Date => !isNaN(date.getTime()))
+      .filter((date): date is Date => !Number.isNaN(date.getTime()))
       .sort((a, b) => a.getTime() - b.getTime());
 
     if (postDates.length === 0) {
-      throw new Error('NO_INFORMATION');
+      throw new Error("NO_INFORMATION");
     }
 
     const earliestDate = postDates[0];
     const latestDate = postDates[postDates.length - 1];
 
     if (targetDate < earliestDate || targetDate > latestDate) {
-      throw new Error('NO_INFORMATION');
+      throw new Error("NO_INFORMATION");
     }
 
-    throw new Error('NO_OPERATION');
+    throw new Error("NO_OPERATION");
   }
 
   return await getMealData(targetPost.documentId, dateParam);
@@ -323,7 +332,7 @@ export async function refreshSpecificDate(dateParam: string): Promise<CafeteriaD
   const documentId = await mongoDB.getDocumentId(dateParam);
 
   if (!documentId) {
-    throw new Error('NO_INFORMATION');
+    throw new Error("NO_INFORMATION");
   }
 
   return await getMealData(documentId, dateParam);

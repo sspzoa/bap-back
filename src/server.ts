@@ -1,18 +1,18 @@
-import { serve } from 'bun';
-import { CONFIG } from './config';
-import { setupRefreshJob } from './jobs/refreshCafeteria';
-import { getCorsHeaders, handleCors } from './middleware/cors';
-import { ApiError, handleError } from './middleware/error';
-import { handleCafeteriaRequest, handleFoodSearchRequest, handleHealthCheck, handleRefreshRequest } from './routes';
-import { logger } from './utils/logger';
-import { mongoDB } from './utils/mongodb';
+import { serve } from "bun";
+import { setupRefreshJob } from "@/jobs/refreshCafeteria";
+import { getCorsHeaders, handleCors } from "@/middleware/cors";
+import { ApiError, handleError } from "@/middleware/error";
+import { handleCafeteriaRequest, handleFoodSearchRequest, handleHealthCheck, handleRefreshRequest } from "@/routes";
+import { CONFIG } from "@/shared/lib/config";
+import { logger } from "@/shared/lib/logger";
+import { mongoDB } from "@/shared/lib/mongodb";
 
 function generateRequestId(): string {
   return Math.random().toString(36).substring(2, 10);
 }
 
 export async function createServer() {
-  logger.info('Starting server initialization');
+  logger.info("Starting server initialization");
 
   try {
     await mongoDB.connect();
@@ -41,21 +41,21 @@ export async function createServer() {
 
           let response: Response;
 
-          if (path === '/health') {
-            const origin = req.headers.get('Origin');
+          if (path === "/health") {
+            const origin = req.headers.get("Origin");
             response = await handleHealthCheck(requestId, origin);
-          } else if (path === '/') {
-            const origin = req.headers.get('Origin');
+          } else if (path === "/") {
+            const origin = req.headers.get("Origin");
             response = new Response(
               JSON.stringify({
                 requestId,
                 timestamp: new Date().toISOString(),
-                message: 'api.밥.net',
+                message: "api.밥.net",
               }),
               {
                 headers: {
                   ...getCorsHeaders(origin),
-                  'Content-Type': 'application/json',
+                  "Content-Type": "application/json",
                 },
               },
             );
@@ -64,18 +64,18 @@ export async function createServer() {
             const refreshMatch = path.match(/^\/refresh\/(\d{4}-\d{2}-\d{2})$/);
             const searchMatch = path.match(/^\/search\/(.+)$/);
 
-            if (refreshMatch && method === 'POST') {
-              const origin = req.headers.get('Origin');
+            if (refreshMatch && method === "POST") {
+              const origin = req.headers.get("Origin");
               response = await handleRefreshRequest(refreshMatch[1], requestId, origin);
-            } else if (searchMatch && method === 'GET') {
-              const origin = req.headers.get('Origin');
+            } else if (searchMatch && method === "GET") {
+              const origin = req.headers.get("Origin");
               const foodName = decodeURIComponent(searchMatch[1]);
               response = await handleFoodSearchRequest(foodName, requestId, origin);
             } else if (dateMatch) {
-              const origin = req.headers.get('Origin');
+              const origin = req.headers.get("Origin");
               response = await handleCafeteriaRequest(dateMatch[1], requestId, origin);
             } else {
-              throw new ApiError(404, 'Endpoint not found');
+              throw new ApiError(404, "Endpoint not found");
             }
           }
 
@@ -84,30 +84,30 @@ export async function createServer() {
         } catch (error) {
           const duration = Date.now() - startTime;
           requestLogger.error(`Request failed after ${duration}ms`, error);
-          const origin = req.headers.get('Origin');
+          const origin = req.headers.get("Origin");
           return handleError(error, requestId, origin);
         }
       },
     });
 
     const shutdown = async () => {
-      logger.info('Shutting down server');
+      logger.info("Shutting down server");
       try {
         if (refreshJob) clearTimeout(refreshJob);
         await mongoDB.disconnect();
-        logger.info('Server shutdown complete');
+        logger.info("Server shutdown complete");
       } catch (error) {
-        logger.error('Error during shutdown', error);
+        logger.error("Error during shutdown", error);
       }
       process.exit(0);
     };
 
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
 
     return server;
   } catch (error) {
-    logger.error('Server initialization failed', error);
+    logger.error("Server initialization failed", error);
     throw error;
   }
 }

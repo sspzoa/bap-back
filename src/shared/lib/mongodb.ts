@@ -1,7 +1,7 @@
-import { type Collection, type Db, MongoClient } from 'mongodb';
-import { CONFIG } from '../config';
-import type { CafeteriaData, MealDataDocument } from '../types';
-import { logger } from './logger';
+import { type Collection, type Db, MongoClient } from "mongodb";
+import { CONFIG } from "@/shared/lib/config";
+import { logger } from "@/shared/lib/logger";
+import type { CafeteriaData, MealDataDocument } from "@/shared/types";
 
 class MongoDBService {
   private client: MongoClient | null = null;
@@ -13,7 +13,7 @@ class MongoDBService {
     }
 
     try {
-      logger.info('Connecting to MongoDB');
+      logger.info("Connecting to MongoDB");
       this.client = new MongoClient(CONFIG.MONGODB.URI, {
         tls: true,
         tlsAllowInvalidCertificates: true,
@@ -26,13 +26,13 @@ class MongoDBService {
 
       logger.info(`Connected to MongoDB: ${CONFIG.MONGODB.DB_NAME}`);
     } catch (error) {
-      logger.error('MongoDB connection failed', error);
+      logger.error("MongoDB connection failed", error);
       throw error;
     }
   }
 
   private async createIndexes(): Promise<void> {
-    if (!this.db) throw new Error('Database not connected');
+    if (!this.db) throw new Error("Database not connected");
 
     const collection = this.db.collection<MealDataDocument>(CONFIG.MONGODB.COLLECTION);
     await collection.createIndex({ documentId: 1 });
@@ -45,12 +45,12 @@ class MongoDBService {
       await this.client.close();
       this.client = null;
       this.db = null;
-      logger.info('MongoDB disconnected');
+      logger.info("MongoDB disconnected");
     }
   }
 
   private getDb(): Db {
-    if (!this.db) throw new Error('Database not connected');
+    if (!this.db) throw new Error("Database not connected");
     return this.db;
   }
 
@@ -130,23 +130,19 @@ class MongoDBService {
   async searchLatestFoodImage(foodName: string): Promise<{
     image: string;
     date: string;
-    mealType: 'breakfast' | 'lunch' | 'dinner';
+    mealType: "breakfast" | "lunch" | "dinner";
   } | null> {
     const collection = this.getMealDataCollection();
 
-    const documents = await collection
-      .find({}, { sort: { _id: -1 } })
-      .toArray();
+    const documents = await collection.find({}, { sort: { _id: -1 } }).toArray();
 
     for (const doc of documents) {
-      for (const mealType of ['breakfast', 'lunch', 'dinner'] as const) {
+      for (const mealType of ["breakfast", "lunch", "dinner"] as const) {
         const meal = doc.data[mealType];
 
-        const hasFood = meal.regular.some(item =>
-          item.toLowerCase().includes(foodName.toLowerCase())
-        ) || meal.simple.some(item =>
-          item.toLowerCase().includes(foodName.toLowerCase())
-        );
+        const hasFood =
+          meal.regular.some((item) => item.toLowerCase().includes(foodName.toLowerCase())) ||
+          meal.simple.some((item) => item.toLowerCase().includes(foodName.toLowerCase()));
 
         if (hasFood && meal.image) {
           return {

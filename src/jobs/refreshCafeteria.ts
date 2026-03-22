@@ -1,11 +1,11 @@
-import { CONFIG } from '../config';
-import { fetchAndSaveCafeteriaData, getLatestMenuPosts } from '../services/cafeteria';
-import { formatDate } from '../utils/date';
-import { closeBrowser } from '../utils/fetch';
-import { logger } from '../utils/logger';
+import { fetchAndSaveCafeteriaData, getLatestMenuPosts } from "@/services/cafeteria";
+import { CONFIG } from "@/shared/lib/config";
+import { logger } from "@/shared/lib/logger";
+import { formatDate } from "@/shared/utils/date";
+import { closeBrowser } from "@/shared/utils/fetch";
 
-export async function refreshCafeteriaData(refreshType: 'today' | 'all' = 'all'): Promise<void> {
-  const refreshLogger = logger.operation('refresh');
+export async function refreshCafeteriaData(refreshType: "today" | "all" = "all"): Promise<void> {
+  const refreshLogger = logger.operation("refresh");
   const timer = refreshLogger.time();
 
   try {
@@ -18,16 +18,17 @@ export async function refreshCafeteriaData(refreshType: 'today' | 'all' = 'all')
     for (const post of menuPosts) {
       try {
         const postDate = new Date(post.date);
-        if (isNaN(postDate.getTime())) {
+        if (Number.isNaN(postDate.getTime())) {
           refreshLogger.warn(`Invalid date: ${post.date} for ${post.title}`);
           continue;
         }
 
-        if (refreshType === 'today') {
+        if (refreshType === "today") {
           const today = new Date();
-          const isToday = postDate.getDate() === today.getDate() &&
-                         postDate.getMonth() === today.getMonth() &&
-                         postDate.getFullYear() === today.getFullYear();
+          const isToday =
+            postDate.getDate() === today.getDate() &&
+            postDate.getMonth() === today.getMonth() &&
+            postDate.getFullYear() === today.getFullYear();
 
           if (!isToday) {
             continue;
@@ -47,18 +48,18 @@ export async function refreshCafeteriaData(refreshType: 'today' | 'all' = 'all')
 
     timer(`Refresh completed (${refreshType}): ${successCount} success, ${errorCount} errors`);
   } catch (error) {
-    refreshLogger.error('Cafeteria refresh failed', error);
+    refreshLogger.error("Cafeteria refresh failed", error);
     throw error;
   } finally {
     await closeBrowser();
   }
 }
 
-function getNextRunTime(): { timeMs: number; refreshType: 'today' | 'all' } {
+function getNextRunTime(): { timeMs: number; refreshType: "today" | "all" } {
   const now = new Date();
   const schedules = CONFIG.REFRESH.SCHEDULE;
   let nextRunTime = Number.MAX_SAFE_INTEGER;
-  let nextRefreshType: 'today' | 'all' = 'all';
+  let nextRefreshType: "today" | "all" = "all";
 
   for (const schedule of schedules) {
     const next = new Date(now);
@@ -69,7 +70,10 @@ function getNextRunTime(): { timeMs: number; refreshType: 'today' | 'all' } {
 
     const daysUntilTarget = (targetDay - currentDay + 7) % 7;
 
-    if (currentDay === targetDay && (now.getHours() < targetHour || (now.getHours() === targetHour && now.getMinutes() < targetMinute))) {
+    if (
+      currentDay === targetDay &&
+      (now.getHours() < targetHour || (now.getHours() === targetHour && now.getMinutes() < targetMinute))
+    ) {
       next.setHours(targetHour, targetMinute, 0, 0);
     } else {
       next.setDate(next.getDate() + (daysUntilTarget || 7));
@@ -96,7 +100,7 @@ function scheduleNextRun(): NodeJS.Timeout {
     try {
       await refreshCafeteriaData(refreshType);
     } catch (error) {
-      logger.error('Scheduled refresh failed', error);
+      logger.error("Scheduled refresh failed", error);
     } finally {
       scheduleNextRun();
     }
@@ -105,12 +109,14 @@ function scheduleNextRun(): NodeJS.Timeout {
 
 export function setupRefreshJob(): NodeJS.Timeout | null {
   const schedules = CONFIG.REFRESH.SCHEDULE;
-  const scheduleInfo = schedules.map((s) => `day ${s.day} at ${s.hour}:${s.minute.toString().padStart(2, '0')} (${s.refreshType})`).join(', ');
+  const scheduleInfo = schedules
+    .map((s) => `day ${s.day} at ${s.hour}:${s.minute.toString().padStart(2, "0")} (${s.refreshType})`)
+    .join(", ");
 
   logger.info(`Setting up refresh job: ${scheduleInfo}`);
 
   refreshCafeteriaData().catch((error) => {
-    logger.error('Initial refresh failed', error);
+    logger.error("Initial refresh failed", error);
   });
 
   return scheduleNextRun();

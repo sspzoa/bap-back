@@ -6,15 +6,32 @@
     "useIgnoreFile": true
   },
   "files": {
-    "maxSize": 3145728
+    "includes": ["**"]
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "linter": {
     "enabled": true,
-    "ignore": ["./public/*"],
     "rules": {
       "recommended": true,
+      "correctness": {
+        "noUnusedImports": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "off"
+      },
+      "complexity": {
+        "useLiteralKeys": "off",
+        "useArrowFunction": "error"
+      },
       "suspicious": {
-        "noExplicitAny": "warn",
+        "noExplicitAny": "off",
+        "noImplicitAnyLet": "off",
         "noArrayIndexKey": "off"
       }
     }
@@ -25,11 +42,7 @@
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 120,
-    "lineEnding": "lf",
-    "ignore": ["./public/*"]
-  },
-  "organizeImports": {
-    "enabled": true
+    "lineEnding": "lf"
   },
   "javascript": {
     "formatter": {
@@ -38,9 +51,15 @@
       "bracketSameLine": true,
       "bracketSpacing": true,
       "jsxQuoteStyle": "double",
-      "quoteStyle": "single",
+      "quoteStyle": "double",
       "semicolons": "always",
       "trailingCommas": "all"
+    }
+  },
+  "json": {
+    "formatter": {
+      "enabled": true,
+      "trailingCommas": "none"
     }
   }
 }

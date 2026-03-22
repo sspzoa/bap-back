@@ -1,12 +1,11 @@
-import { Puppeteer, createPuppeteerCDPSession } from '@scrapeless-ai/sdk';
-import { CONFIG } from '../config';
-import { logger } from './logger';
+import { createPuppeteerCDPSession, Puppeteer } from "@scrapeless-ai/sdk";
+import { CONFIG } from "@/shared/lib/config";
+import { logger } from "@/shared/lib/logger";
 
 function normalizeFullWidthCharacters(text: string): string {
   return text
-    .replace(/[\uFF01-\uFF5E]/g, (char) => 
-      String.fromCharCode(char.charCodeAt(0) - 0xFEE0))
-    .replace(/\u3000/g, ' ')
+    .replace(/[\uFF01-\uFF5E]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/\u3000/g, " ")
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"');
 }
@@ -16,12 +15,12 @@ let browserInstance: BrowserInstance | null = null;
 
 async function getBrowser(): Promise<BrowserInstance> {
   if (!browserInstance) {
-    logger.info('Creating browser instance');
+    logger.info("Creating browser instance");
     browserInstance = await Puppeteer.connect({
       apiKey: process.env.SCRAPELESS_API_KEY,
-      session_name: 'fetchWithPuppeteer',
+      session_name: "fetchWithPuppeteer",
       session_ttl: 10000,
-      proxy_country: 'ANY',
+      proxy_country: "ANY",
       session_recording: true,
       defaultViewport: null,
     });
@@ -36,7 +35,7 @@ export class HttpError extends Error {
     public readonly url?: string,
   ) {
     super(message);
-    this.name = 'HttpError';
+    this.name = "HttpError";
   }
 }
 
@@ -45,10 +44,10 @@ async function fetchWithPuppeteer(
   options: RequestInit & { method?: string; timeout?: number; solveCaptcha?: boolean; body?: any } = {},
 ): Promise<Response> {
   const { solveCaptcha = false, body } = options;
-  const isPost = (options.method || 'GET').toUpperCase() === 'POST';
+  const isPost = (options.method || "GET").toUpperCase() === "POST";
   const browser = await getBrowser();
   const page = await browser.newPage();
-  const fetchLogger = logger.operation('fetch');
+  const fetchLogger = logger.operation("fetch");
 
   try {
     let content: string;
@@ -57,29 +56,29 @@ async function fetchWithPuppeteer(
       content = await page.evaluate(
         async (fetchUrl: string, fetchBody: string, fetchHeaders: Record<string, string>) => {
           const res = await fetch(fetchUrl, {
-            method: 'POST',
+            method: "POST",
             body: fetchBody,
             headers: fetchHeaders,
           });
           return res.text();
         },
         url,
-        (options.body as string) || '',
+        (options.body as string) || "",
         (options.headers as Record<string, string>) || {},
       );
     } else {
-      await page.goto(url, { waitUntil: 'networkidle2' });
+      await page.goto(url, { waitUntil: "networkidle2" });
 
       if (solveCaptcha) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const cdpSession = await createPuppeteerCDPSession(page as any);
           await cdpSession.waitCaptchaDetected();
-          fetchLogger.info('Solving captcha');
+          fetchLogger.info("Solving captcha");
           await cdpSession.solveCaptcha();
           await cdpSession.waitCaptchaSolved();
-          fetchLogger.info('Captcha solved');
-          await page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {});
+          fetchLogger.info("Captcha solved");
+          await page.waitForNavigation({ waitUntil: "networkidle2" }).catch(() => {});
         } catch {
           // No captcha detected
         }
@@ -93,7 +92,7 @@ async function fetchWithPuppeteer(
     return {
       ok: true,
       status: 200,
-      statusText: 'OK',
+      statusText: "OK",
       headers: new Headers(),
       url,
       json: async () => JSON.parse(normalizedContent),
@@ -106,24 +105,27 @@ async function fetchWithPuppeteer(
     } as Response;
   } catch (error) {
     fetchLogger.error(`Fetch failed: ${url}`, error);
-    throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`, url);
+    throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : "Unknown error"}`, url);
   } finally {
     await page.close();
   }
 }
 
-async function fetchWithNative(url: string, options: RequestInit & { method?: string; timeout?: number; body?: any } = {}): Promise<Response> {
+async function fetchWithNative(
+  url: string,
+  options: RequestInit & { method?: string; timeout?: number; body?: any } = {},
+): Promise<Response> {
   const { timeout = 30000, ...fetchOptions } = options;
-  const fetchLogger = logger.operation('fetch');
+  const fetchLogger = logger.operation("fetch");
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     const response = await fetch(url, {
-      method: options.method || 'GET',
+      method: options.method || "GET",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
       },
       body: options.body,
       ...fetchOptions,
@@ -139,10 +141,10 @@ async function fetchWithNative(url: string, options: RequestInit & { method?: st
     return response;
   } catch (error) {
     fetchLogger.error(`Fetch failed: ${url}`, error);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new HttpError(408, 'Request timeout', url);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new HttpError(408, "Request timeout", url);
     }
-    throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`, url);
+    throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : "Unknown error"}`, url);
   }
 }
 
@@ -176,7 +178,7 @@ export async function fetchWithRetry<T>(
     ...fetchOptions
   } = options;
 
-  const retryLogger = logger.operation('fetch-retry');
+  const retryLogger = logger.operation("fetch-retry");
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -209,7 +211,7 @@ export { normalizeFullWidthCharacters };
 
 export async function closeBrowser() {
   if (browserInstance) {
-    logger.info('Closing browser instance');
+    logger.info("Closing browser instance");
     await browserInstance.close();
     browserInstance = null;
   }
