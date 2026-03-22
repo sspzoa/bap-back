@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { MealNoOperationError, MealNotFoundError } from "@/middleware/error";
 import { CONFIG } from "@/shared/lib/config";
 import { logger } from "@/shared/lib/logger";
 import { mongoDB } from "@/shared/lib/mongodb";
@@ -286,7 +287,7 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData
   const { earliest, latest } = await mongoDB.getDateRange();
 
   if (!earliest || !latest) {
-    throw new Error("NO_INFORMATION");
+    throw new MealNotFoundError();
   }
 
   const targetDate = new Date(dateParam);
@@ -294,10 +295,10 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData
   const latestDate = new Date(latest);
 
   if (targetDate < earliestDate || targetDate > latestDate) {
-    throw new Error("NO_INFORMATION");
+    throw new MealNotFoundError();
   }
 
-  throw new Error("NO_OPERATION");
+  throw new MealNoOperationError();
 }
 
 export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: MenuPost[]): Promise<CafeteriaData> {
@@ -312,17 +313,17 @@ export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: Me
       .sort((a, b) => a.getTime() - b.getTime());
 
     if (postDates.length === 0) {
-      throw new Error("NO_INFORMATION");
+      throw new MealNotFoundError();
     }
 
     const earliestDate = postDates[0];
     const latestDate = postDates[postDates.length - 1];
 
     if (targetDate < earliestDate || targetDate > latestDate) {
-      throw new Error("NO_INFORMATION");
+      throw new MealNotFoundError();
     }
 
-    throw new Error("NO_OPERATION");
+    throw new MealNoOperationError();
   }
 
   return await getMealData(targetPost.documentId, dateParam);
@@ -332,7 +333,7 @@ export async function refreshSpecificDate(dateParam: string): Promise<CafeteriaD
   const documentId = await mongoDB.getDocumentId(dateParam);
 
   if (!documentId) {
-    throw new Error("NO_INFORMATION");
+    throw new MealNotFoundError();
   }
 
   return await getMealData(documentId, dateParam);

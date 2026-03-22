@@ -1,11 +1,15 @@
-const allowedOrigins = ["https://xn--rh3b.net", "https://밥.net", "http://localhost:3000", "http://localhost:3001"];
+const productionOrigins = ["https://xn--rh3b.net", "https://밥.net"];
+const devOrigins = ["http://localhost:3000", "http://localhost:3001"];
+
+const allowedOrigins =
+  process.env.NODE_ENV === "production" ? productionOrigins : [...productionOrigins, ...devOrigins];
 
 export function getCorsHeaders(origin: string | null): Record<string, string> {
   const isAllowed = origin && allowedOrigins.includes(origin);
   return {
     "Access-Control-Allow-Origin": isAllowed ? origin : allowedOrigins[0],
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 }
 

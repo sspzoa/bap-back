@@ -12,6 +12,20 @@ export class ApiError extends Error {
   }
 }
 
+export class MealNotFoundError extends Error {
+  constructor(message = "급식 정보가 없어요") {
+    super(message);
+    this.name = "MealNotFoundError";
+  }
+}
+
+export class MealNoOperationError extends Error {
+  constructor(message = "급식 운영이 없어요") {
+    super(message);
+    this.name = "MealNoOperationError";
+  }
+}
+
 export function handleError(error: unknown, requestId?: string, origin: string | null = null): Response {
   logger.error("Request error:", error);
 

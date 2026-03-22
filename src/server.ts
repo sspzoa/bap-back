@@ -65,6 +65,10 @@ export async function createServer() {
             const searchMatch = path.match(/^\/search\/(.+)$/);
 
             if (refreshMatch && method === "POST") {
+              const apiKey = req.headers.get("Authorization")?.replace("Bearer ", "");
+              if (!CONFIG.REFRESH_API_KEY || apiKey !== CONFIG.REFRESH_API_KEY) {
+                throw new ApiError(401, "Unauthorized");
+              }
               const origin = req.headers.get("Origin");
               response = await handleRefreshRequest(refreshMatch[1], requestId, origin);
             } else if (searchMatch && method === "GET") {

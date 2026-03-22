@@ -133,24 +133,32 @@ class MongoDBService {
     mealType: "breakfast" | "lunch" | "dinner";
   } | null> {
     const collection = this.getMealDataCollection();
+    const regex = new RegExp(foodName, "i");
 
-    const documents = await collection.find({}, { sort: { _id: -1 } }).toArray();
+    const mealTypes = ["breakfast", "lunch", "dinner"] as const;
 
-    for (const doc of documents) {
-      for (const mealType of ["breakfast", "lunch", "dinner"] as const) {
-        const meal = doc.data[mealType];
+    for (const mealType of mealTypes) {
+      const result = await collection.findOne(
+        {
+          $and: [
+            {
+              $or: [
+                { [`data.${mealType}.regular`]: { $elemMatch: { $regex: regex } } },
+                { [`data.${mealType}.simple`]: { $elemMatch: { $regex: regex } } },
+              ],
+            },
+            { [`data.${mealType}.image`]: { $ne: "" } },
+          ],
+        },
+        { sort: { _id: -1 } },
+      );
 
-        const hasFood =
-          meal.regular.some((item) => item.toLowerCase().includes(foodName.toLowerCase())) ||
-          meal.simple.some((item) => item.toLowerCase().includes(foodName.toLowerCase()));
-
-        if (hasFood && meal.image) {
-          return {
-            image: meal.image,
-            date: doc._id,
-            mealType,
-          };
-        }
+      if (result) {
+        return {
+          image: result.data[mealType].image,
+          date: result._id,
+          mealType,
+        };
       }
     }
 

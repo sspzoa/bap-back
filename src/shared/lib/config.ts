@@ -26,6 +26,7 @@ export const CONFIG = {
     LUNCH: "중식",
     DINNER: "석식",
   },
+  REFRESH_API_KEY: process.env.REFRESH_API_KEY || "",
   MONGODB: {
     URI: process.env.MONGODB_URI || "mongodb://localhost:27017",
     DB_NAME: process.env.MONGODB_DB_NAME || "mongo_db_name",

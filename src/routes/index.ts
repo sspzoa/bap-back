@@ -1,5 +1,5 @@
 import { getCorsHeaders } from "@/middleware/cors";
-import { ApiError } from "@/middleware/error";
+import { ApiError, MealNoOperationError, MealNotFoundError } from "@/middleware/error";
 import { getCafeteriaData, refreshSpecificDate } from "@/services/cafeteria";
 import { mongoDB } from "@/shared/lib/mongodb";
 import type { CafeteriaResponse, FoodSearchResponse, HealthCheckResponse } from "@/shared/types";
@@ -53,13 +53,11 @@ export async function handleCafeteriaRequest(
       },
     });
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === "NO_OPERATION") {
-        throw new ApiError(404, "급식 운영이 없어요");
-      }
-      if (error.message === "NO_INFORMATION" || error.message.includes("not found")) {
-        throw new ApiError(404, "급식 정보가 없어요");
-      }
+    if (error instanceof MealNoOperationError) {
+      throw new ApiError(404, error.message);
+    }
+    if (error instanceof MealNotFoundError) {
+      throw new ApiError(404, error.message);
     }
     throw error;
   }
@@ -91,10 +89,8 @@ export async function handleRefreshRequest(
       },
     });
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === "NO_INFORMATION" || error.message.includes("not found")) {
-        throw new ApiError(404, "급식 정보가 없어요");
-      }
+    if (error instanceof MealNotFoundError) {
+      throw new ApiError(404, error.message);
     }
     throw error;
   }
@@ -105,9 +101,9 @@ export async function handleFoodSearchRequest(
   requestId: string,
   origin: string | null = null,
 ): Promise<Response> {
-  const latestImage = await mongoDB.searchLatestFoodImage(foodName);
+  const result = await mongoDB.searchLatestFoodImage(foodName);
 
-  if (!latestImage) {
+  if (!result) {
     throw new ApiError(404, "해당 메뉴를 찾을 수 없어요");
   }
 
@@ -115,9 +111,9 @@ export async function handleFoodSearchRequest(
     requestId,
     timestamp: new Date().toISOString(),
     foodName,
-    image: latestImage.image,
-    date: latestImage.date,
-    mealType: latestImage.mealType,
+    image: result.image,
+    date: result.date,
+    mealType: result.mealType,
   };
 
   return new Response(JSON.stringify(response), {
