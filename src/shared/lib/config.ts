@@ -13,9 +13,9 @@ export const CONFIG = {
     HOST: process.env.HOST || "localhost",
   },
   WEBSITE: {
-    BASE_URL: "https://dimigo-h.goeas.kr/dimigo-h/na/ntt",
-    LIST_PATH: "selectNttList.do",
-    INFO_PATH: "selectNttInfo.do",
+    BASE_URL: "https://dimigo-h.goeas.kr",
+    LIST_PATH: "dimigo-h/na/ntt/selectNttList.do",
+    INFO_PATH: "dimigo-h/na/ntt/selectNttInfo.do",
     PAGE_RANGE: {
       START: 1,
       END: 1,

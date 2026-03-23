@@ -235,7 +235,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       const imgAlt = $(element).attr("alt")?.toLowerCase() || "";
 
       if (imgSrc) {
-        const fullUrl = new URL(imgSrc).toString();
+        const fullUrl = new URL(imgSrc, CONFIG.WEBSITE.BASE_URL).toString();
         if (imgAlt.includes("조")) processedMenu.breakfast.image = fullUrl;
         else if (imgAlt.includes("중")) processedMenu.lunch.image = fullUrl;
         else if (imgAlt.includes("석")) processedMenu.dinner.image = fullUrl;
