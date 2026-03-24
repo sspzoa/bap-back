@@ -1,11 +1,13 @@
 import { serve } from "bun";
 import { setupRefreshJob } from "@/jobs/refreshCafeteria";
+import { setupDguRefreshJob } from "@/jobs/refreshDgu";
 import { getCorsHeaders, handleCors } from "@/middleware/cors";
 import { ApiError, handleError } from "@/middleware/error";
 import { handleCafeteriaRequest, handleFoodSearchRequest, handleHealthCheck, handleRefreshRequest } from "@/routes";
+import { handleDguCafeteriaRequest, handleDguHealthCheck, handleDguRefreshRequest } from "@/routes/dgu";
 import { CONFIG } from "@/shared/lib/config";
 import { logger } from "@/shared/lib/logger";
-import { mongoDB } from "@/shared/lib/mongodb";
+import { dguMongoDB, mongoDB } from "@/shared/lib/mongodb";
 
 function generateRequestId(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -16,7 +18,9 @@ export async function createServer() {
 
   try {
     await mongoDB.connect();
+    await dguMongoDB.connect();
     const refreshJob = setupRefreshJob();
+    const dguRefreshJob = setupDguRefreshJob();
 
     logger.info(`Server running at http://${CONFIG.SERVER.HOST}:${CONFIG.SERVER.PORT}`);
 
@@ -59,6 +63,25 @@ export async function createServer() {
                 },
               },
             );
+          } else if (path.startsWith("/dgu")) {
+            const dguPath = path.replace(/^\/dgu/, "");
+            const dguDateMatch = dguPath.match(/^\/(\d{4}-\d{2}-\d{2})$/);
+            const dguRefreshMatch = dguPath.match(/^\/refresh\/(\d{4}-\d{2}-\d{2})$/);
+            const origin = req.headers.get("Origin");
+
+            if (dguPath === "/health") {
+              response = await handleDguHealthCheck(requestId, origin);
+            } else if (dguRefreshMatch && method === "POST") {
+              const apiKey = req.headers.get("Authorization")?.replace("Bearer ", "");
+              if (!CONFIG.REFRESH_API_KEY || apiKey !== CONFIG.REFRESH_API_KEY) {
+                throw new ApiError(401, "Unauthorized");
+              }
+              response = await handleDguRefreshRequest(dguRefreshMatch[1], requestId, origin);
+            } else if (dguDateMatch) {
+              response = await handleDguCafeteriaRequest(dguDateMatch[1], requestId, origin);
+            } else {
+              throw new ApiError(404, "Endpoint not found");
+            }
           } else {
             const dateMatch = path.match(/^\/(\d{4}-\d{2}-\d{2})$/);
             const refreshMatch = path.match(/^\/refresh\/(\d{4}-\d{2}-\d{2})$/);
@@ -98,7 +121,9 @@ export async function createServer() {
       logger.info("Shutting down server");
       try {
         if (refreshJob) clearTimeout(refreshJob);
+        if (dguRefreshJob) clearTimeout(dguRefreshJob);
         await mongoDB.disconnect();
+        await dguMongoDB.disconnect();
         logger.info("Server shutdown complete");
       } catch (error) {
         logger.error("Error during shutdown", error);

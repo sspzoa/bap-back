@@ -14,6 +14,29 @@ export function isValidDate(dateString: string): boolean {
   return !Number.isNaN(date.getTime());
 }
 
+export function dateToSday(dateStr: string): number {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const utcMs = Date.UTC(year, month - 1, day) - kstOffset;
+  return Math.floor(utcMs / 1000);
+}
+
+export function getWeekDates(date: string): string[] {
+  const target = new Date(date);
+  const dayOfWeek = target.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(target);
+  monday.setDate(target.getDate() + mondayOffset);
+
+  const dates: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    dates.push(formatDate(d));
+  }
+  return dates;
+}
+
 export function parseKoreanDate(text: string, registrationDate?: string): Date | null {
   const normalizedText = text.replace(/[\uFF01-\uFF5E]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0));
 

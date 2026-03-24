@@ -1,7 +1,7 @@
 import { type Collection, type Db, MongoClient } from "mongodb";
 import { CONFIG } from "@/shared/lib/config";
 import { logger } from "@/shared/lib/logger";
-import type { CafeteriaData, MealDataDocument } from "@/shared/types";
+import type { CafeteriaData, DguCafeteriaData, DguMealDataDocument, MealDataDocument } from "@/shared/types";
 
 class MongoDBService {
   private client: MongoClient | null = null;
@@ -167,3 +167,100 @@ class MongoDBService {
 }
 
 export const mongoDB = new MongoDBService();
+
+class DguMongoDBService {
+  private client: MongoClient | null = null;
+  private db: Db | null = null;
+
+  async connect(): Promise<void> {
+    if (this.client && this.db) {
+      return;
+    }
+
+    try {
+      logger.info("Connecting to DGU MongoDB");
+      this.client = new MongoClient(CONFIG.MONGODB.URI, {
+        tls: true,
+        tlsAllowInvalidCertificates: true,
+        tlsAllowInvalidHostnames: true,
+      });
+
+      await this.client.connect();
+      this.db = this.client.db(CONFIG.DGU.MONGODB.DB_NAME);
+      await this.createIndexes();
+
+      logger.info(`Connected to DGU MongoDB: ${CONFIG.DGU.MONGODB.DB_NAME}`);
+    } catch (error) {
+      logger.error("DGU MongoDB connection failed", error);
+      throw error;
+    }
+  }
+
+  private async createIndexes(): Promise<void> {
+    if (!this.db) throw new Error("Database not connected");
+
+    const collection = this.db.collection<DguMealDataDocument>(CONFIG.DGU.MONGODB.COLLECTION);
+    await collection.createIndex({ createdAt: 1 });
+    await collection.createIndex({ updatedAt: 1 });
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.client) {
+      await this.client.close();
+      this.client = null;
+      this.db = null;
+      logger.info("DGU MongoDB disconnected");
+    }
+  }
+
+  private getDb(): Db {
+    if (!this.db) throw new Error("Database not connected");
+    return this.db;
+  }
+
+  private getCollection(): Collection<DguMealDataDocument> {
+    return this.getDb().collection<DguMealDataDocument>(CONFIG.DGU.MONGODB.COLLECTION);
+  }
+
+  async saveMealData(date: string, data: DguCafeteriaData): Promise<void> {
+    const collection = this.getCollection();
+    const now = new Date();
+
+    const existingDoc = await collection.findOne({ _id: date });
+
+    if (existingDoc) {
+      await collection.updateOne(
+        { _id: date },
+        { $set: { data, updatedAt: now } },
+      );
+      logger.info(`Updated DGU meal data: ${date}`);
+    } else {
+      await collection.insertOne({
+        _id: date,
+        data,
+        createdAt: now,
+        updatedAt: now,
+      });
+      logger.info(`Saved DGU meal data: ${date}`);
+    }
+  }
+
+  async getMealData(date: string): Promise<DguCafeteriaData | null> {
+    const collection = this.getCollection();
+    const document = await collection.findOne({ _id: date });
+    return document?.data || null;
+  }
+
+  async getStats(): Promise<{ totalMealData: number; lastUpdated: Date | null }> {
+    const collection = this.getCollection();
+    const totalMealData = await collection.countDocuments();
+    const lastDocument = await collection.findOne({}, { sort: { updatedAt: -1 } });
+
+    return {
+      totalMealData,
+      lastUpdated: lastDocument?.updatedAt || null,
+    };
+  }
+}
+
+export const dguMongoDB = new DguMongoDBService();

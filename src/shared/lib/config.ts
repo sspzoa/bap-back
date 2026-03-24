@@ -32,6 +32,43 @@ export const CONFIG = {
     DB_NAME: process.env.MONGODB_DB_NAME || "mongo_db_name",
     COLLECTION: "meal_data",
   },
+  DGU: {
+    WEBSITE: {
+      BASE_URL: "https://dgucoop.dongguk.edu/mobile",
+      RESTAURANTS: [
+        { id: "1F", name: "1층", code: 7 },
+        { id: "2F", name: "2층", code: 1 },
+        { id: "3F", name: "3층", code: 5 },
+      ],
+    },
+    MONGODB: {
+      DB_NAME: process.env.DGU_MONGODB_DB_NAME || "dgu-bap",
+      COLLECTION: "meal_data",
+    },
+    REFRESH: {
+      SCHEDULE: [
+        { day: 0, hour: 3, minute: 0, refreshType: "all" },
+        { day: 0, hour: 10, minute: 30, refreshType: "today" },
+        { day: 1, hour: 3, minute: 0, refreshType: "all" },
+        { day: 1, hour: 10, minute: 30, refreshType: "today" },
+        { day: 1, hour: 16, minute: 0, refreshType: "today" },
+        { day: 2, hour: 3, minute: 0, refreshType: "all" },
+        { day: 2, hour: 10, minute: 30, refreshType: "today" },
+        { day: 2, hour: 16, minute: 0, refreshType: "today" },
+        { day: 3, hour: 3, minute: 0, refreshType: "all" },
+        { day: 3, hour: 10, minute: 30, refreshType: "today" },
+        { day: 3, hour: 16, minute: 0, refreshType: "today" },
+        { day: 4, hour: 3, minute: 0, refreshType: "all" },
+        { day: 4, hour: 10, minute: 30, refreshType: "today" },
+        { day: 4, hour: 16, minute: 0, refreshType: "today" },
+        { day: 5, hour: 3, minute: 0, refreshType: "all" },
+        { day: 5, hour: 10, minute: 30, refreshType: "today" },
+        { day: 5, hour: 16, minute: 0, refreshType: "today" },
+        { day: 6, hour: 3, minute: 0, refreshType: "all" },
+        { day: 6, hour: 10, minute: 30, refreshType: "today" },
+      ],
+    },
+  },
   HTTP: {
     RETRY: {
       COUNT: 3,
