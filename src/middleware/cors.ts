@@ -1,4 +1,4 @@
-const productionOrigins = ["https://xn--rh3b.net", "https://밥.net"];
+const productionOrigins = ["https://xn--rh3b.net", "https://밥.net", "https://xn--3o2bl7m86e.xn--rh3b.net", "https://상록원.밥.net"];
 const devOrigins = ["http://localhost:3000", "http://localhost:3001"];
 
 const allowedOrigins =
