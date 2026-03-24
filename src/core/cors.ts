@@ -1,13 +1,18 @@
-const productionOrigins = ["https://xn--rh3b.net", "https://밥.net", "https://xn--3o2bl7m86e.xn--rh3b.net", "https://상록원.밥.net"];
+import { getRegistry } from "@/providers/registry";
+
 const devOrigins = ["http://localhost:3000", "http://localhost:3001"];
 
-const allowedOrigins =
-  process.env.NODE_ENV === "production" ? productionOrigins : [...productionOrigins, ...devOrigins];
+function getAllowedOrigins(): string[] {
+  const registry = getRegistry();
+  const providerOrigins = registry.getAllOrigins();
+  return process.env.NODE_ENV === "production" ? providerOrigins : [...providerOrigins, ...devOrigins];
+}
 
 export function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigins = getAllowedOrigins();
   const isAllowed = origin && allowedOrigins.includes(origin);
   return {
-    "Access-Control-Allow-Origin": isAllowed ? origin : allowedOrigins[0],
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowedOrigins[0] || "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };

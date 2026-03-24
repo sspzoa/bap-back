@@ -1,13 +1,12 @@
 import { serve } from "bun";
-import { setupRefreshJob } from "@/jobs/refreshCafeteria";
-import { setupDguRefreshJob } from "@/jobs/refreshDgu";
-import { getCorsHeaders, handleCors } from "@/middleware/cors";
-import { ApiError, handleError } from "@/middleware/error";
-import { handleCafeteriaRequest, handleFoodSearchRequest, handleHealthCheck, handleRefreshRequest } from "@/routes";
-import { handleDguCafeteriaRequest, handleDguHealthCheck, handleDguRefreshRequest } from "@/routes/dgu";
-import { CONFIG } from "@/shared/lib/config";
-import { logger } from "@/shared/lib/logger";
-import { dguMongoDB, mongoDB } from "@/shared/lib/mongodb";
+import { CONFIG } from "@/core/config";
+import { getCorsHeaders, handleCors } from "@/core/cors";
+import { ApiError, MealNoOperationError, MealNotFoundError, handleError } from "@/core/errors";
+import { logger } from "@/core/logger";
+import { setupScheduler } from "@/core/scheduler";
+import type { HealthCheckResponse, MealResponse } from "@/core/types";
+import { initializeRegistry } from "@/providers/registry";
+import { isValidDate } from "@/utils/date";
 
 function generateRequestId(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -17,12 +16,25 @@ export async function createServer() {
   logger.info("Starting server initialization");
 
   try {
-    await mongoDB.connect();
-    await dguMongoDB.connect();
-    const refreshJob = setupRefreshJob();
-    const dguRefreshJob = setupDguRefreshJob();
+    const registry = initializeRegistry();
+    const providers = registry.getProviders();
+
+    for (const provider of providers) {
+      await provider.init();
+    }
+
+    const schedulerHandles: (NodeJS.Timeout | null)[] = [];
+    for (const provider of providers) {
+      const handle = setupScheduler(
+        provider.config.id,
+        provider.config.schedule,
+        (type) => provider.runRefresh(type),
+      );
+      schedulerHandles.push(handle);
+    }
 
     logger.info(`Server running at http://${CONFIG.SERVER.HOST}:${CONFIG.SERVER.PORT}`);
+    logger.info(`Registered providers: ${providers.map((p) => p.config.id).join(", ")}`);
 
     const server = serve({
       port: CONFIG.SERVER.PORT,
@@ -43,14 +55,10 @@ export async function createServer() {
             return corsResponse;
           }
 
-          let response: Response;
+          const origin = req.headers.get("Origin");
 
-          if (path === "/health") {
-            const origin = req.headers.get("Origin");
-            response = await handleHealthCheck(requestId, origin);
-          } else if (path === "/") {
-            const origin = req.headers.get("Origin");
-            response = new Response(
+          if (path === "/") {
+            const response = new Response(
               JSON.stringify({
                 requestId,
                 timestamp: new Date().toISOString(),
@@ -63,44 +71,81 @@ export async function createServer() {
                 },
               },
             );
-          } else if (path.startsWith("/dgu")) {
-            const dguPath = path.replace(/^\/dgu/, "");
-            const dguDateMatch = dguPath.match(/^\/(\d{4}-\d{2}-\d{2})$/);
-            const dguRefreshMatch = dguPath.match(/^\/refresh\/(\d{4}-\d{2}-\d{2})$/);
-            const origin = req.headers.get("Origin");
+            requestLogger.response(response.status, Date.now() - startTime);
+            return response;
+          }
 
-            if (dguPath === "/health") {
-              response = await handleDguHealthCheck(requestId, origin);
-            } else if (dguRefreshMatch && method === "POST") {
-              const apiKey = req.headers.get("Authorization")?.replace("Bearer ", "");
-              if (!CONFIG.REFRESH_API_KEY || apiKey !== CONFIG.REFRESH_API_KEY) {
-                throw new ApiError(401, "Unauthorized");
-              }
-              response = await handleDguRefreshRequest(dguRefreshMatch[1], requestId, origin);
-            } else if (dguDateMatch) {
-              response = await handleDguCafeteriaRequest(dguDateMatch[1], requestId, origin);
-            } else {
-              throw new ApiError(404, "Endpoint not found");
-            }
+          const provider = registry.findByPath(path);
+          if (!provider) {
+            throw new ApiError(404, "Endpoint not found");
+          }
+
+          const subPath = registry.getSubPath(provider, path);
+          let response: Response;
+
+          if (subPath === "/health") {
+            const stats = await provider.getStats();
+            const body: HealthCheckResponse = {
+              requestId,
+              timestamp: new Date().toISOString(),
+              status: "ok",
+              database: {
+                connected: true,
+                totalMealData: stats.totalMealData,
+                lastUpdated: stats.lastUpdated,
+              },
+            };
+            response = new Response(JSON.stringify(body), {
+              headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
+            });
           } else {
-            const dateMatch = path.match(/^\/(\d{4}-\d{2}-\d{2})$/);
-            const refreshMatch = path.match(/^\/refresh\/(\d{4}-\d{2}-\d{2})$/);
-            const searchMatch = path.match(/^\/search\/(.+)$/);
+            const refreshMatch = subPath.match(/^\/refresh\/(\d{4}-\d{2}-\d{2})$/);
+            const dateMatch = subPath.match(/^\/(\d{4}-\d{2}-\d{2})$/);
 
             if (refreshMatch && method === "POST") {
               const apiKey = req.headers.get("Authorization")?.replace("Bearer ", "");
               if (!CONFIG.REFRESH_API_KEY || apiKey !== CONFIG.REFRESH_API_KEY) {
                 throw new ApiError(401, "Unauthorized");
               }
-              const origin = req.headers.get("Origin");
-              response = await handleRefreshRequest(refreshMatch[1], requestId, origin);
-            } else if (searchMatch && method === "GET") {
-              const origin = req.headers.get("Origin");
-              const foodName = decodeURIComponent(searchMatch[1]);
-              response = await handleFoodSearchRequest(foodName, requestId, origin);
+
+              const date = refreshMatch[1];
+              if (!isValidDate(date)) {
+                throw new ApiError(400, "Invalid date format");
+              }
+
+              const data = await provider.refreshMealData(date);
+              const body: MealResponse = { requestId, timestamp: new Date().toISOString(), date, data };
+              response = new Response(JSON.stringify(body), {
+                headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
+              });
             } else if (dateMatch) {
-              const origin = req.headers.get("Origin");
-              response = await handleCafeteriaRequest(dateMatch[1], requestId, origin);
+              const date = dateMatch[1];
+              if (!isValidDate(date)) {
+                throw new ApiError(400, "Invalid date format");
+              }
+
+              try {
+                const data = await provider.getMealData(date);
+                const body: MealResponse = { requestId, timestamp: new Date().toISOString(), date, data };
+                response = new Response(JSON.stringify(body), {
+                  headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
+                });
+              } catch (error) {
+                if (error instanceof MealNoOperationError) {
+                  throw new ApiError(404, error.message);
+                }
+                if (error instanceof MealNotFoundError) {
+                  throw new ApiError(404, error.message);
+                }
+                throw error;
+              }
+            } else if (provider.handleExtraRoute) {
+              const extraResponse = await provider.handleExtraRoute(subPath, method, requestId, origin);
+              if (extraResponse) {
+                response = extraResponse;
+              } else {
+                throw new ApiError(404, "Endpoint not found");
+              }
             } else {
               throw new ApiError(404, "Endpoint not found");
             }
@@ -120,10 +165,12 @@ export async function createServer() {
     const shutdown = async () => {
       logger.info("Shutting down server");
       try {
-        if (refreshJob) clearTimeout(refreshJob);
-        if (dguRefreshJob) clearTimeout(dguRefreshJob);
-        await mongoDB.disconnect();
-        await dguMongoDB.disconnect();
+        for (const handle of schedulerHandles) {
+          if (handle) clearTimeout(handle);
+        }
+        for (const provider of providers) {
+          await provider.shutdown();
+        }
         logger.info("Server shutdown complete");
       } catch (error) {
         logger.error("Error during shutdown", error);

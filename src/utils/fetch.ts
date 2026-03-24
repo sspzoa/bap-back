@@ -1,6 +1,6 @@
 import { createPuppeteerCDPSession, Puppeteer } from "@scrapeless-ai/sdk";
-import { CONFIG } from "@/shared/lib/config";
-import { logger } from "@/shared/lib/logger";
+import { CONFIG } from "@/core/config";
+import { logger } from "@/core/logger";
 
 function normalizeFullWidthCharacters(text: string): string {
   return text
@@ -43,7 +43,7 @@ async function fetchWithPuppeteer(
   url: string,
   options: RequestInit & { method?: string; timeout?: number; solveCaptcha?: boolean; body?: any } = {},
 ): Promise<Response> {
-  const { solveCaptcha = false, body } = options;
+  const { solveCaptcha = false } = options;
   const isPost = (options.method || "GET").toUpperCase() === "POST";
   const browser = await getBrowser();
   const page = await browser.newPage();

@@ -1,11 +1,11 @@
 import * as cheerio from "cheerio";
-import { MealNoOperationError, MealNotFoundError } from "@/middleware/error";
-import { CONFIG } from "@/shared/lib/config";
-import { logger } from "@/shared/lib/logger";
-import { mongoDB } from "@/shared/lib/mongodb";
-import type { CafeteriaData, MenuPost, ProcessedMealMenu } from "@/shared/types";
-import { formatDate } from "@/shared/utils/date";
-import { fetchWithRetry } from "@/shared/utils/fetch";
+import { MealNoOperationError, MealNotFoundError } from "@/core/errors";
+import { logger } from "@/core/logger";
+import type { MongoDBService } from "@/core/mongodb";
+import { KDMHS_WEBSITE, MEAL_TYPES } from "@/providers/kdmhs/config";
+import type { CafeteriaData, FoodSearchResult, MealDataDocument, MenuPost, ProcessedMealMenu } from "@/providers/kdmhs/types";
+import { formatDate } from "@/utils/date";
+import { closeBrowser, fetchWithRetry } from "@/utils/fetch";
 
 function calculateMenuDate(title: string, registrationDateStr: string): Date | null {
   const monthDayMatch = title.match(/(\d{1,2})월\s*(\d{1,2})일/);
@@ -34,8 +34,8 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
   const allPosts: MenuPost[] = [];
 
   try {
-    for (let page = CONFIG.WEBSITE.PAGE_RANGE.START; page <= CONFIG.WEBSITE.PAGE_RANGE.END; page++) {
-      const url = `${CONFIG.WEBSITE.BASE_URL}/${CONFIG.WEBSITE.LIST_PATH}`;
+    for (let page = KDMHS_WEBSITE.PAGE_RANGE.START; page <= KDMHS_WEBSITE.PAGE_RANGE.END; page++) {
+      const url = `${KDMHS_WEBSITE.BASE_URL}/${KDMHS_WEBSITE.LIST_PATH}`;
 
       const html = await fetchWithRetry<string>(url, {
         method: "POST",
@@ -79,7 +79,7 @@ export async function getLatestMenuPosts(): Promise<MenuPost[]> {
     }
 
     timer(
-      `Fetched total ${allPosts.length} menu posts from pages ${CONFIG.WEBSITE.PAGE_RANGE.START}-${CONFIG.WEBSITE.PAGE_RANGE.END}`,
+      `Fetched total ${allPosts.length} menu posts from pages ${KDMHS_WEBSITE.PAGE_RANGE.START}-${KDMHS_WEBSITE.PAGE_RANGE.END}`,
     );
     return allPosts;
   } catch (error) {
@@ -130,12 +130,12 @@ const parseMenu = (menuStr: string): string[] => {
   return items;
 };
 
-async function getMealData(documentId: string, dateKey: string): Promise<CafeteriaData> {
+async function getMealData(db: MongoDBService, documentId: string, dateKey: string): Promise<CafeteriaData> {
   const mealLogger = logger.operation("parse-meal", dateKey);
   const timer = mealLogger.time();
 
   try {
-    const url = `${CONFIG.WEBSITE.BASE_URL}/${CONFIG.WEBSITE.INFO_PATH}?mi=13609&bbsId=6909&nttSn=${documentId}`;
+    const url = `${KDMHS_WEBSITE.BASE_URL}/${KDMHS_WEBSITE.INFO_PATH}?mi=13609&bbsId=6909&nttSn=${documentId}`;
 
     const html = await fetchWithRetry<string>(url, {
       method: "POST",
@@ -174,9 +174,9 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
         const line = lines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
 
         if (
-          line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`) ||
-          line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`) ||
-          line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)
+          line.startsWith(`*${MEAL_TYPES.BREAKFAST}:`) ||
+          line.startsWith(`*${MEAL_TYPES.LUNCH}:`) ||
+          line.startsWith(`*${MEAL_TYPES.DINNER}:`)
         ) {
           break;
         }
@@ -212,18 +212,18 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
     for (let i = 0; i < contentLines.length; i++) {
       const line = contentLines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
 
-      if (line.startsWith(`*${CONFIG.MEAL_TYPES.BREAKFAST}:`)) {
-        const { regular, simple, plus } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.BREAKFAST);
+      if (line.startsWith(`*${MEAL_TYPES.BREAKFAST}:`)) {
+        const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.BREAKFAST);
         processedMenu.breakfast.regular = regular;
         processedMenu.breakfast.simple = simple;
         processedMenu.breakfast.plus = plus;
-      } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.LUNCH}:`)) {
-        const { regular, simple, plus } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.LUNCH);
+      } else if (line.startsWith(`*${MEAL_TYPES.LUNCH}:`)) {
+        const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.LUNCH);
         processedMenu.lunch.regular = regular;
         processedMenu.lunch.simple = simple;
         processedMenu.lunch.plus = plus;
-      } else if (line.startsWith(`*${CONFIG.MEAL_TYPES.DINNER}:`)) {
-        const { regular, simple, plus } = parseMealSection(contentLines, i, CONFIG.MEAL_TYPES.DINNER);
+      } else if (line.startsWith(`*${MEAL_TYPES.DINNER}:`)) {
+        const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.DINNER);
         processedMenu.dinner.regular = regular;
         processedMenu.dinner.simple = simple;
         processedMenu.dinner.plus = plus;
@@ -236,7 +236,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
 
       if (imgSrc) {
         try {
-          const fullUrl = new URL(imgSrc, CONFIG.WEBSITE.BASE_URL).toString();
+          const fullUrl = new URL(imgSrc, KDMHS_WEBSITE.BASE_URL).toString();
           if (imgAlt.includes("조")) processedMenu.breakfast.image = fullUrl;
           else if (imgAlt.includes("중")) processedMenu.lunch.image = fullUrl;
           else if (imgAlt.includes("석")) processedMenu.dinner.image = fullUrl;
@@ -264,7 +264,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       processedMenu.dinner.plus.length === 0;
 
     if (isAllMealsEmpty) {
-      const existingData = await mongoDB.getMealData(dateKey);
+      const existingData = await db.getMealData<CafeteriaData>(dateKey);
       if (existingData) {
         mealLogger.info("All meals are empty, preserving existing data");
         timer("Preserved existing meal data (empty refresh result)");
@@ -272,7 +272,7 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
       }
     }
 
-    await mongoDB.saveMealData(dateKey, result, documentId);
+    await db.saveMealData(dateKey, result, { documentId });
     timer("Parsed and saved meal data");
 
     return result;
@@ -282,21 +282,23 @@ async function getMealData(documentId: string, dateKey: string): Promise<Cafeter
   }
 }
 
-export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData> {
-  const cachedData = await mongoDB.getMealData(dateParam);
+export async function getCafeteriaData(db: MongoDBService, dateParam: string): Promise<CafeteriaData> {
+  const cachedData = await db.getMealData<CafeteriaData>(dateParam);
   if (cachedData) {
     return cachedData;
   }
 
-  const { earliest, latest } = await mongoDB.getDateRange();
+  const collection = db.getCollection<MealDataDocument>();
+  const [earliest] = await collection.find().sort({ _id: 1 }).limit(1).toArray();
+  const [latest] = await collection.find().sort({ _id: -1 }).limit(1).toArray();
 
   if (!earliest || !latest) {
     throw new MealNotFoundError();
   }
 
   const targetDate = new Date(dateParam);
-  const earliestDate = new Date(earliest);
-  const latestDate = new Date(latest);
+  const earliestDate = new Date(earliest._id);
+  const latestDate = new Date(latest._id);
 
   if (targetDate < earliestDate || targetDate > latestDate) {
     throw new MealNotFoundError();
@@ -305,7 +307,11 @@ export async function getCafeteriaData(dateParam: string): Promise<CafeteriaData
   throw new MealNoOperationError();
 }
 
-export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: MenuPost[]): Promise<CafeteriaData> {
+export async function fetchAndSaveCafeteriaData(
+  db: MongoDBService,
+  dateParam: string,
+  menuPosts: MenuPost[],
+): Promise<CafeteriaData> {
   const targetPost = findMenuPostForDate(menuPosts, dateParam);
 
   if (!targetPost) {
@@ -330,15 +336,102 @@ export async function fetchAndSaveCafeteriaData(dateParam: string, menuPosts: Me
     throw new MealNoOperationError();
   }
 
-  return await getMealData(targetPost.documentId, dateParam);
+  return await getMealData(db, targetPost.documentId, dateParam);
 }
 
-export async function refreshSpecificDate(dateParam: string): Promise<CafeteriaData> {
-  const documentId = await mongoDB.getDocumentId(dateParam);
+export async function refreshSpecificDate(db: MongoDBService, dateParam: string): Promise<CafeteriaData> {
+  const collection = db.getCollection<MealDataDocument>();
+  const document = await collection.findOne({ _id: dateParam }, { projection: { documentId: 1 } });
+  const documentId = document?.documentId || null;
 
   if (!documentId) {
     throw new MealNotFoundError();
   }
 
-  return await getMealData(documentId, dateParam);
+  return await getMealData(db, documentId, dateParam);
+}
+
+export async function searchLatestFoodImage(db: MongoDBService, foodName: string): Promise<FoodSearchResult | null> {
+  const collection = db.getCollection<MealDataDocument>();
+  const regex = new RegExp(foodName, "i");
+
+  const mealTypes = ["breakfast", "lunch", "dinner"] as const;
+
+  for (const mealType of mealTypes) {
+    const result = await collection.findOne(
+      {
+        $and: [
+          {
+            $or: [
+              { [`data.${mealType}.regular`]: { $elemMatch: { $regex: regex } } },
+              { [`data.${mealType}.simple`]: { $elemMatch: { $regex: regex } } },
+            ],
+          },
+          { [`data.${mealType}.image`]: { $ne: "" } },
+        ],
+      },
+      { sort: { _id: -1 } },
+    );
+
+    if (result) {
+      return {
+        image: result.data[mealType].image,
+        date: result._id,
+        mealType,
+      };
+    }
+  }
+
+  return null;
+}
+
+export async function runKdmhsRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {
+  const refreshLogger = logger.operation("kdmhs-refresh");
+  const timer = refreshLogger.time();
+
+  try {
+    refreshLogger.info(`Starting KDMHS cafeteria data refresh (${refreshType})`);
+
+    const menuPosts = await getLatestMenuPosts();
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const post of menuPosts) {
+      try {
+        const postDate = new Date(post.date);
+        if (Number.isNaN(postDate.getTime())) {
+          refreshLogger.warn(`Invalid date: ${post.date} for ${post.title}`);
+          continue;
+        }
+
+        if (refreshType === "today") {
+          const today = new Date();
+          const isToday =
+            postDate.getDate() === today.getDate() &&
+            postDate.getMonth() === today.getMonth() &&
+            postDate.getFullYear() === today.getFullYear();
+
+          if (!isToday) {
+            continue;
+          }
+        }
+
+        const dateKey = formatDate(postDate);
+        refreshLogger.info(`Processing ${dateKey}`);
+        await fetchAndSaveCafeteriaData(db, dateKey, menuPosts);
+        refreshLogger.info(`✓ Completed ${dateKey}`);
+        successCount++;
+      } catch (error) {
+        errorCount++;
+        refreshLogger.error(`✗ Failed ${post.title}`, error);
+      }
+    }
+
+    timer(`KDMHS refresh completed (${refreshType}): ${successCount} success, ${errorCount} errors`);
+  } catch (error) {
+    refreshLogger.error("KDMHS cafeteria refresh failed", error);
+    throw error;
+  } finally {
+    await closeBrowser();
+  }
 }

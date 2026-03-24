@@ -1,5 +1,5 @@
-import { getCorsHeaders } from "@/middleware/cors";
-import { logger } from "@/shared/lib/logger";
+import { getCorsHeaders } from "@/core/cors";
+import { logger } from "@/core/logger";
 
 export class ApiError extends Error {
   constructor(

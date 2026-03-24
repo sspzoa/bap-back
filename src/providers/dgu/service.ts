@@ -1,11 +1,11 @@
 import * as cheerio from "cheerio";
-import { MealNotFoundError } from "@/middleware/error";
-import { CONFIG } from "@/shared/lib/config";
-import { logger } from "@/shared/lib/logger";
-import { dguMongoDB } from "@/shared/lib/mongodb";
-import type { DguCafeteriaData, DguCategory, DguMealInfo, DguMenuItem } from "@/shared/types";
-import { dateToSday } from "@/shared/utils/date";
-import { fetchWithRetry } from "@/shared/utils/fetch";
+import { MealNotFoundError } from "@/core/errors";
+import { logger } from "@/core/logger";
+import type { MongoDBService } from "@/core/mongodb";
+import { DGU_WEBSITE } from "@/providers/dgu/config";
+import type { DguCafeteriaData, DguCategory, DguMealInfo, DguMenuItem } from "@/providers/dgu/types";
+import { dateToSday, formatDate, getWeekDates } from "@/utils/date";
+import { fetchWithRetry } from "@/utils/fetch";
 
 const ORIGIN_PATTERN = /\([^)]*[:：][^)]*산[^)]*\)/g;
 const HOURS_PATTERN = /^\d{1,2}:\d{2}\s*[~～\-]/;
@@ -140,7 +140,7 @@ function refineCategoryName(category: DguCategory): DguCategory {
 
 async function fetchRestaurantMenu(code: number, date: string): Promise<DguCategory[]> {
   const sday = dateToSday(date);
-  const url = `${CONFIG.DGU.WEBSITE.BASE_URL}/menu.html?code=${code}&sday=${sday}`;
+  const url = `${DGU_WEBSITE.BASE_URL}/menu.html?code=${code}&sday=${sday}`;
 
   const html = await fetchWithRetry<string>(url, {
     method: "GET",
@@ -196,7 +196,7 @@ async function fetchAllRestaurants(date: string): Promise<DguCafeteriaData> {
   const timer = fetchLogger.time();
 
   const restaurants = await Promise.all(
-    CONFIG.DGU.WEBSITE.RESTAURANTS.map(async (restaurant) => {
+    DGU_WEBSITE.RESTAURANTS.map(async (restaurant) => {
       try {
         const categories = await fetchRestaurantMenu(restaurant.code, date);
         fetchLogger.info(`Fetched ${restaurant.name}: ${categories.length} categories`);
@@ -221,8 +221,8 @@ async function fetchAllRestaurants(date: string): Promise<DguCafeteriaData> {
   return { restaurants };
 }
 
-export async function getDguCafeteriaData(dateParam: string): Promise<DguCafeteriaData> {
-  const cachedData = await dguMongoDB.getMealData(dateParam);
+export async function getDguCafeteriaData(db: MongoDBService, dateParam: string): Promise<DguCafeteriaData> {
+  const cachedData = await db.getMealData<DguCafeteriaData>(dateParam);
   if (cachedData) {
     return cachedData;
   }
@@ -230,8 +230,40 @@ export async function getDguCafeteriaData(dateParam: string): Promise<DguCafeter
   throw new MealNotFoundError();
 }
 
-export async function refreshDguCafeteriaData(dateParam: string): Promise<DguCafeteriaData> {
+export async function refreshDguCafeteriaData(db: MongoDBService, dateParam: string): Promise<DguCafeteriaData> {
   const data = await fetchAllRestaurants(dateParam);
-  await dguMongoDB.saveMealData(dateParam, data);
+  await db.saveMealData(dateParam, data);
   return data;
+}
+
+export async function runDguRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {
+  const refreshLogger = logger.operation("dgu-refresh");
+  const timer = refreshLogger.time();
+
+  try {
+    refreshLogger.info(`Starting DGU cafeteria data refresh (${refreshType})`);
+
+    const today = formatDate(new Date());
+    const dates = refreshType === "all" ? getWeekDates(today) : [today];
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const date of dates) {
+      try {
+        refreshLogger.info(`Processing DGU ${date}`);
+        await refreshDguCafeteriaData(db, date);
+        refreshLogger.info(`✓ Completed DGU ${date}`);
+        successCount++;
+      } catch (error) {
+        errorCount++;
+        refreshLogger.error(`✗ Failed DGU ${date}`, error);
+      }
+    }
+
+    timer(`DGU refresh completed (${refreshType}): ${successCount} success, ${errorCount} errors`);
+  } catch (error) {
+    refreshLogger.error("DGU cafeteria refresh failed", error);
+    throw error;
+  }
 }

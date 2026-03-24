@@ -51,7 +51,6 @@ export function parseKoreanDate(text: string, registrationDate?: string): Date |
     const registrationMonth = new Date(registrationDate).getMonth() + 1;
     const menuMonth = Number.parseInt(month, 10);
 
-    // 12월에 업로드된 1월 메뉴의 경우 등록년도 + 1
     if (registrationMonth === 12 && menuMonth === 1) {
       year = registrationYear + 1;
     } else {

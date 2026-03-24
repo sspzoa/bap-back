@@ -1,0 +1,53 @@
+import type { ProviderConfig } from "@/providers/types";
+
+export const KDMHS_CONFIG: ProviderConfig = {
+  id: "kdmhs",
+  name: "한국디지털미디어고등학교",
+  basePath: "",
+  origins: ["https://xn--rh3b.net", "https://밥.net"],
+  dbName: process.env.MONGODB_DB_NAME || "mongo_db_name",
+  collection: "meal_data",
+  schedule: [
+    { day: 0, hour: 3, minute: 0, refreshType: "all" },
+    { day: 0, hour: 7, minute: 0, refreshType: "today" },
+    { day: 0, hour: 11, minute: 50, refreshType: "today" },
+    { day: 0, hour: 17, minute: 50, refreshType: "today" },
+    { day: 1, hour: 3, minute: 0, refreshType: "all" },
+    { day: 1, hour: 6, minute: 30, refreshType: "today" },
+    { day: 1, hour: 12, minute: 40, refreshType: "today" },
+    { day: 1, hour: 18, minute: 20, refreshType: "today" },
+    { day: 2, hour: 3, minute: 0, refreshType: "all" },
+    { day: 2, hour: 6, minute: 30, refreshType: "today" },
+    { day: 2, hour: 12, minute: 40, refreshType: "today" },
+    { day: 2, hour: 18, minute: 20, refreshType: "today" },
+    { day: 3, hour: 3, minute: 0, refreshType: "all" },
+    { day: 3, hour: 6, minute: 30, refreshType: "today" },
+    { day: 3, hour: 12, minute: 40, refreshType: "today" },
+    { day: 3, hour: 18, minute: 20, refreshType: "today" },
+    { day: 4, hour: 3, minute: 0, refreshType: "all" },
+    { day: 4, hour: 6, minute: 30, refreshType: "today" },
+    { day: 4, hour: 12, minute: 40, refreshType: "today" },
+    { day: 4, hour: 18, minute: 20, refreshType: "today" },
+    { day: 5, hour: 3, minute: 0, refreshType: "all" },
+    { day: 5, hour: 6, minute: 30, refreshType: "today" },
+    { day: 5, hour: 12, minute: 40, refreshType: "today" },
+    { day: 5, hour: 18, minute: 20, refreshType: "today" },
+    { day: 6, hour: 3, minute: 0, refreshType: "all" },
+    { day: 6, hour: 7, minute: 0, refreshType: "today" },
+    { day: 6, hour: 11, minute: 50, refreshType: "today" },
+    { day: 6, hour: 17, minute: 50, refreshType: "today" },
+  ],
+};
+
+export const KDMHS_WEBSITE = {
+  BASE_URL: "https://dimigo-h.goeas.kr",
+  LIST_PATH: "dimigo-h/na/ntt/selectNttList.do",
+  INFO_PATH: "dimigo-h/na/ntt/selectNttInfo.do",
+  PAGE_RANGE: { START: 1, END: 1 },
+} as const;
+
+export const MEAL_TYPES = {
+  BREAKFAST: "조식",
+  LUNCH: "중식",
+  DINNER: "석식",
+} as const;
