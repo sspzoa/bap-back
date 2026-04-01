@@ -42,6 +42,7 @@ jobs:
             SCRAPELESS_API_KEY=${{ secrets.SCRAPELESS_API_KEY }}
             MONGODB_URI=${{ secrets.MONGODB_URI }}
             MONGODB_DB_NAME=${{ secrets.MONGODB_DB_NAME }}
+            REFRESH_API_KEY=${{ secrets.REFRESH_API_KEY }}
 
   deploy:
     needs: build
@@ -64,4 +65,5 @@ jobs:
             -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
             -e MONGODB_DB_NAME=${{ secrets.MONGODB_DB_NAME }} \
             -e DGU_MONGODB_DB_NAME=${{ secrets.DGU_MONGODB_DB_NAME }} \
+            -e REFRESH_API_KEY=${{ secrets.REFRESH_API_KEY }} \
             ${{ env.DOCKER_IMAGE }}:latest
