@@ -164,7 +164,11 @@ async function getMealData(db: MongoDBService, documentId: string, dateKey: stri
 
     const parseMealSection = (lines: string[], startIndex: number, mealType: string) => {
       const mealLine = lines[startIndex].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
-      const mealText = mealLine.replace(`*${mealType}:`, "").trim();
+      const mealText = mealLine.split(':')[1]?.trim();
+
+      if (!mealText) {
+        return { regular: [], simple: [], plus: [] };
+      }
 
       const regular = parseMenu(mealText);
       let simple: string[] = [];
@@ -174,9 +178,9 @@ async function getMealData(db: MongoDBService, documentId: string, dateKey: stri
         const line = lines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
 
         if (
-          line.startsWith(`*${MEAL_TYPES.BREAKFAST}:`) ||
-          line.startsWith(`*${MEAL_TYPES.LUNCH}:`) ||
-          line.startsWith(`*${MEAL_TYPES.DINNER}:`)
+          line.startsWith(`*${MEAL_TYPES.BREAKFAST}`) ||
+          line.startsWith(`*${MEAL_TYPES.LUNCH}`) ||
+          line.startsWith(`*${MEAL_TYPES.DINNER}`)
         ) {
           break;
         }
@@ -212,17 +216,17 @@ async function getMealData(db: MongoDBService, documentId: string, dateKey: stri
     for (let i = 0; i < contentLines.length; i++) {
       const line = contentLines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
 
-      if (line.startsWith(`*${MEAL_TYPES.BREAKFAST}:`)) {
+      if (line.startsWith(`*${MEAL_TYPES.BREAKFAST}`)) {
         const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.BREAKFAST);
         processedMenu.breakfast.regular = regular;
         processedMenu.breakfast.simple = simple;
         processedMenu.breakfast.plus = plus;
-      } else if (line.startsWith(`*${MEAL_TYPES.LUNCH}:`)) {
+      } else if (line.startsWith(`*${MEAL_TYPES.LUNCH}`)) {
         const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.LUNCH);
         processedMenu.lunch.regular = regular;
         processedMenu.lunch.simple = simple;
         processedMenu.lunch.plus = plus;
-      } else if (line.startsWith(`*${MEAL_TYPES.DINNER}:`)) {
+      } else if (line.startsWith(`*${MEAL_TYPES.DINNER}`)) {
         const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.DINNER);
         processedMenu.dinner.regular = regular;
         processedMenu.dinner.simple = simple;
