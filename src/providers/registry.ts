@@ -41,7 +41,12 @@ export function getRegistry(): ProviderRegistry {
 
 export function initializeRegistry(): ProviderRegistry {
   const reg = getRegistry();
-  reg.register(createKdmhsProvider());
-  reg.register(createDguProvider());
+
+  // Guard against repeated initialization in the same process.
+  if (reg.getProviders().length === 0) {
+    reg.register(createKdmhsProvider());
+    reg.register(createDguProvider());
+  }
+
   return reg;
 }

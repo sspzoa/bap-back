@@ -117,10 +117,11 @@ async function fetchWithNative(
 ): Promise<Response> {
   const { timeout = 30000, ...fetchOptions } = options;
   const fetchLogger = logger.operation("fetch");
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    timeoutId = setTimeout(() => controller.abort(), timeout);
 
     const response = await fetch(url, {
       method: options.method || "GET",
@@ -131,8 +132,6 @@ async function fetchWithNative(
       ...fetchOptions,
       signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new HttpError(response.status, `HTTP ${response.status}: ${response.statusText}`, url);
@@ -145,6 +144,10 @@ async function fetchWithNative(
       throw new HttpError(408, "Request timeout", url);
     }
     throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : "Unknown error"}`, url);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 

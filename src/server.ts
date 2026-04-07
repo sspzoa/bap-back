@@ -3,6 +3,7 @@ import { CONFIG } from "@/core/config";
 import { getCorsHeaders, handleCors } from "@/core/cors";
 import { ApiError, MealNoOperationError, MealNotFoundError, handleError } from "@/core/errors";
 import { logger } from "@/core/logger";
+import type { SchedulerHandle } from "@/core/scheduler";
 import { setupScheduler } from "@/core/scheduler";
 import type { HealthCheckResponse, MealResponse } from "@/core/types";
 import { initializeRegistry } from "@/providers/registry";
@@ -23,18 +24,7 @@ export async function createServer() {
       await provider.init();
     }
 
-    const schedulerHandles: (NodeJS.Timeout | null)[] = [];
-    for (const provider of providers) {
-      const handle = setupScheduler(
-        provider.config.id,
-        provider.config.schedule,
-        (type) => provider.runRefresh(type),
-      );
-      schedulerHandles.push(handle);
-    }
-
-    logger.info(`Server running at http://${CONFIG.SERVER.HOST}:${CONFIG.SERVER.PORT}`);
-    logger.info(`Registered providers: ${providers.map((p) => p.config.id).join(", ")}`);
+    const schedulerHandles: (SchedulerHandle | null)[] = [];
 
     const server = serve({
       port: CONFIG.SERVER.PORT,
@@ -162,11 +152,27 @@ export async function createServer() {
       },
     });
 
+    for (const provider of providers) {
+      const handle = setupScheduler(
+        provider.config.id,
+        provider.config.schedule,
+        (type) => provider.runRefresh(type),
+      );
+      schedulerHandles.push(handle);
+    }
+
+    logger.info(`Server running at http://${CONFIG.SERVER.HOST}:${CONFIG.SERVER.PORT}`);
+    logger.info(`Registered providers: ${providers.map((p) => p.config.id).join(", ")}`);
+
+    let shuttingDown = false;
     const shutdown = async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+
       logger.info("Shutting down server");
       try {
         for (const handle of schedulerHandles) {
-          if (handle) clearTimeout(handle);
+          handle?.cancel();
         }
         for (const provider of providers) {
           await provider.shutdown();
@@ -178,8 +184,8 @@ export async function createServer() {
       process.exit(0);
     };
 
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
 
     return server;
   } catch (error) {

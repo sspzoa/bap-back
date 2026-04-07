@@ -1,6 +1,10 @@
 import { logger } from "@/core/logger";
 import type { ScheduleEntry } from "@/providers/types";
 
+export interface SchedulerHandle {
+  cancel(): void;
+}
+
 function getNextRunTime(schedules: ScheduleEntry[]): { timeMs: number; refreshType: "today" | "all" } {
   const now = new Date();
   let nextRunTime = Number.MAX_SAFE_INTEGER;
@@ -39,8 +43,11 @@ export function setupScheduler(
   providerId: string,
   schedule: ScheduleEntry[],
   refreshFn: (type: "today" | "all") => Promise<void>,
-): NodeJS.Timeout | null {
+): SchedulerHandle | null {
   if (schedule.length === 0) return null;
+
+  let currentTimeout: NodeJS.Timeout | null = null;
+  let cancelled = false;
 
   const scheduleInfo = schedule
     .map((s) => `day ${s.day} at ${s.hour}:${s.minute.toString().padStart(2, "0")} (${s.refreshType})`)
@@ -52,22 +59,36 @@ export function setupScheduler(
     logger.error(`[${providerId}] Initial refresh failed`, error);
   });
 
-  function scheduleNextRun(): NodeJS.Timeout {
+  function scheduleNextRun(): void {
+    if (cancelled) return;
+
     const { timeMs, refreshType } = getNextRunTime(schedule);
     const nextRunDate = new Date(Date.now() + timeMs);
 
     logger.info(`[${providerId}] Next refresh: ${nextRunDate.toLocaleString()} (${refreshType})`);
 
-    return <NodeJS.Timeout>setTimeout(async () => {
+    currentTimeout = <NodeJS.Timeout>setTimeout(async () => {
       try {
         await refreshFn(refreshType);
       } catch (error) {
         logger.error(`[${providerId}] Scheduled refresh failed`, error);
       } finally {
-        scheduleNextRun();
+        if (!cancelled) {
+          scheduleNextRun();
+        }
       }
     }, timeMs);
   }
 
-  return scheduleNextRun();
+  scheduleNextRun();
+
+  return {
+    cancel() {
+      cancelled = true;
+      if (currentTimeout) {
+        clearTimeout(currentTimeout);
+        currentTimeout = null;
+      }
+    },
+  };
 }
