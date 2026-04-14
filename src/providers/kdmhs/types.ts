@@ -10,6 +10,7 @@ export interface ProcessedMeal {
   simple: string[];
   plus: string[];
   image: string;
+  kcal: number;
 }
 
 export interface ProcessedMealMenu {
@@ -22,6 +23,10 @@ export interface CafeteriaData {
   breakfast: ProcessedMeal;
   lunch: ProcessedMeal;
   dinner: ProcessedMeal;
+}
+
+export interface CafeteriaWeekData {
+  [date: string]: CafeteriaData;
 }
 
 export interface MealDataDocument {

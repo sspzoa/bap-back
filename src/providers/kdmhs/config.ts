@@ -62,8 +62,7 @@ export const KDMHS_CONFIG: ProviderConfig = {
 
 export const KDMHS_WEBSITE = {
   BASE_URL: "https://dimigo-h.goeas.kr",
-  LIST_PATH: "dimigo-h/na/ntt/selectNttList.do",
-  INFO_PATH: "dimigo-h/na/ntt/selectNttInfo.do",
+  TABLE_PATH: "dimigo-h/ad/fm/foodmenu/selectFoodMenuView.do",
   PAGE_RANGE: { START: 1, END: 1 },
 } as const;
 

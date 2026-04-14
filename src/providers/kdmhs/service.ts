@@ -6,6 +6,7 @@ import { KDMHS_WEBSITE, MEAL_TYPES } from "@/providers/kdmhs/config";
 import type { CafeteriaData, FoodSearchResult, MealDataDocument, MenuPost, ProcessedMealMenu } from "@/providers/kdmhs/types";
 import { formatDate } from "@/utils/date";
 import { closeBrowser, fetchWithRetry } from "@/utils/fetch";
+import { CafeteriaWeekData } from "./types";
 
 function calculateMenuDate(title: string, registrationDateStr: string): Date | null {
   const monthDayMatch = title.match(/(\d{1,2})월\s*(\d{1,2})일/);
@@ -29,65 +30,6 @@ function calculateMenuDate(title: string, registrationDateStr: string): Date | n
   return new Date(menuYear, menuMonth - 1, menuDay);
 }
 
-export async function getLatestMenuPosts(): Promise<MenuPost[]> {
-  const timer = logger.time();
-  const allPosts: MenuPost[] = [];
-
-  try {
-    for (let page = KDMHS_WEBSITE.PAGE_RANGE.START; page <= KDMHS_WEBSITE.PAGE_RANGE.END; page++) {
-      const url = `${KDMHS_WEBSITE.BASE_URL}/${KDMHS_WEBSITE.LIST_PATH}`;
-
-      const html = await fetchWithRetry<string>(url, {
-        method: "POST",
-        body: new URLSearchParams({
-          currPage: String(page),
-          mi: "13609",
-          bbsId: "6909",
-        }).toString(),
-        parser: async (response) => response.text(),
-        solveCaptcha: true,
-      });
-
-      const $ = cheerio.load(html);
-      const posts = $(".BD_list tbody tr")
-        .map((_, row) => {
-          const linkElement = $(row).find(".ta_l a");
-          const documentId = linkElement.attr("data-id");
-          if (!documentId) return null;
-
-          const title = linkElement.text().trim();
-          if (!title.includes("식단")) return null;
-
-          const registrationDate = $(row).find("td:nth-child(4)").text().trim();
-
-          const menuDate = calculateMenuDate(title, registrationDate);
-          if (!menuDate) return null;
-
-          return {
-            documentId,
-            title,
-            date: formatDate(menuDate),
-            registrationDate,
-            parsedDate: menuDate,
-          };
-        })
-        .get()
-        .filter((post): post is MenuPost & { parsedDate: Date } => post !== null);
-
-      allPosts.push(...posts);
-      logger.info(`Fetched ${posts.length} menu posts from page ${page}`);
-    }
-
-    timer(
-      `Fetched total ${allPosts.length} menu posts from pages ${KDMHS_WEBSITE.PAGE_RANGE.START}-${KDMHS_WEBSITE.PAGE_RANGE.END}`,
-    );
-    return allPosts;
-  } catch (error) {
-    logger.error("Failed to fetch menu posts", error);
-    throw error;
-  }
-}
-
 function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost | undefined {
   const targetDate = new Date(dateParam);
   const targetDateStr = formatDate(targetDate);
@@ -99,6 +41,15 @@ function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost
 
 const parseMenu = (menuStr: string): string[] => {
   if (!menuStr) return [];
+
+  const sanitizeMenuItem = (item: string): string => {
+    return item
+      .replaceAll(/\u00A0/g, " ")
+      .replace(/\(\s*\d{1,2}(?:\.\d{1,2})*\s*\)/g, "")
+      .replace(/(?<=\D)\d{1,2}(?:\.\d{1,2})*(?=(?:or|OR|$|\s|[,&/]))/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  };
 
   const items: string[] = [];
   let current = "";
@@ -127,159 +78,274 @@ const parseMenu = (menuStr: string): string[] => {
     items.push(current.trim());
   }
 
-  return items;
+  return items.map(sanitizeMenuItem).filter(Boolean);
 };
 
-async function getMealData(db: MongoDBService, documentId: string, dateKey: string): Promise<CafeteriaData> {
+async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<CafeteriaWeekData> {
   const mealLogger = logger.operation("parse-meal", dateKey);
   const timer = mealLogger.time();
 
   try {
-    const url = `${KDMHS_WEBSITE.BASE_URL}/${KDMHS_WEBSITE.INFO_PATH}?mi=13609&bbsId=6909&nttSn=${documentId}`;
+    const url = `${KDMHS_WEBSITE.BASE_URL}/${KDMHS_WEBSITE.TABLE_PATH}?mi=13655`;
 
     const html = await fetchWithRetry<string>(url, {
       method: "POST",
+      body: {
+        "schDt": dateKey
+      },
       parser: async (response) => response.text(),
     });
 
     const $ = cheerio.load(html);
-    const pElements = $(".bbsV_cont p");
-    const contentLines =
-      pElements.length > 0
-        ? pElements
-            .map((_, el) => $(el).text().trim())
-            .get()
-            .filter(Boolean)
-        : $(".bbsV_cont")
-            .text()
-            .split("\n")
-            .map((line) => line.trim())
-            .filter(Boolean);
 
-    const processedMenu: ProcessedMealMenu = {
-      breakfast: { regular: [], simple: [], plus: [], image: "" },
-      lunch: { regular: [], simple: [], plus: [], image: "" },
-      dinner: { regular: [], simple: [], plus: [], image: "" },
+    const createEmptyMeal = () => ({ regular: [], simple: [], plus: [], image: "", kcal: 0 });
+    const createEmptyDay = (): CafeteriaData => ({
+      breakfast: createEmptyMeal(),
+      lunch: createEmptyMeal(),
+      dinner: createEmptyMeal(),
+    });
+
+    const hasMeaningfulCellContent = (cell: cheerio.Cheerio<cheerio.Element>): boolean => {
+      const detailParagraph = cell
+        .find("p")
+        .filter((_, p) => {
+          const pEl = $(p);
+          const cls = pEl.attr("class") || "";
+          if (cls === "fm_img" || cls.includes("fm_tit_p")) {
+            return false;
+          }
+
+          const htmlText = pEl.html() || "";
+          const plainText = pEl.text().trim();
+          if (plainText.includes("상세보기")) {
+            return false;
+          }
+
+          return htmlText.includes("<br") || plainText.length > 0;
+        })
+        .last();
+
+      return detailParagraph.length > 0 && detailParagraph.text().trim().length > 0;
     };
 
-    const parseMealSection = (lines: string[], startIndex: number, mealType: string) => {
-      const mealLine = lines[startIndex].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
-      const mealText = mealLine.split(':')[1]?.trim();
+    const mealRows = $("tbody tr")
+      .toArray()
+      .map((row) => $(row))
+      .filter((rowEl) => {
+        const label = rowEl.find("th").first().text().trim();
+        return label === MEAL_TYPES.BREAKFAST || label === MEAL_TYPES.LUNCH || label === MEAL_TYPES.DINNER;
+      });
 
-      if (!mealText) {
-        return { regular: [], simple: [], plus: [] };
+    const resolveDateColumns = (): Array<{ cellIndex: number; date: string }> => {
+      const headerCells = $("thead tr")
+        .last()
+        .find("th, td")
+        .toArray();
+
+      const columns = headerCells
+        .map((cell, headerIndex) => {
+          const text = $(cell).text().replace(/\s+/g, " ").trim();
+          const dateMatch = text.match(/\d{4}-\d{2}-\d{2}/);
+          if (!dateMatch) {
+            return null;
+          }
+
+          const cellIndex = headerIndex - 1;
+          if (cellIndex < 0) {
+            return null;
+          }
+
+          return { cellIndex, date: dateMatch[0] };
+        })
+        .filter((value): value is { cellIndex: number; date: string } => value !== null);
+
+      if (columns.length > 0) {
+        return columns;
       }
 
-      const regular = parseMenu(mealText);
-      let simple: string[] = [];
-      let plus: string[] = [];
+      const anchor = new Date(dateKey);
+      const day = anchor.getDay();
+      const sundayOffset = -day;
+      const sunday = new Date(anchor);
+      sunday.setDate(anchor.getDate() + sundayOffset);
 
-      for (let i = startIndex + 1; i < lines.length; i++) {
-        const line = lines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
+      return Array.from({ length: 7 }, (_, idx) => {
+        const d = new Date(sunday);
+        d.setDate(sunday.getDate() + idx);
+        return { cellIndex: idx, date: formatDate(d) };
+      });
+    };
 
-        if (
-          line.startsWith(`*${MEAL_TYPES.BREAKFAST}`) ||
-          line.startsWith(`*${MEAL_TYPES.LUNCH}`) ||
-          line.startsWith(`*${MEAL_TYPES.DINNER}`)
-        ) {
-          break;
+    const dateColumns = resolveDateColumns();
+
+    const parseMealCell = (cell: cheerio.Cheerio<cheerio.Element>) => {
+      const regular: string[] = [];
+      const simple: string[] = [];
+      const plus: string[] = [];
+
+      const kcalText = cell.find(".fm_tit_p").first().text().trim();
+      const kcalMatch = kcalText.match(/([\d.]+)/);
+      const kcal = kcalMatch ? Number.parseFloat(kcalMatch[1]) : 0;
+
+      let image = "";
+      const imgSrc = cell.find(".fm_img img").first().attr("src");
+      if (imgSrc && !imgSrc.includes("/images/ad/fm/meal_icon.png")) {
+        try {
+          image = new URL(imgSrc, KDMHS_WEBSITE.BASE_URL).toString();
+        } catch {
+          mealLogger.warn(`Failed to parse image URL: ${imgSrc}`);
+        }
+      }
+
+      const detailParagraph =
+        cell
+          .find("p")
+          .filter((_, p) => {
+            const pEl = $(p);
+            const cls = pEl.attr("class") || "";
+            if (cls === "fm_img" || cls.includes("fm_tit_p")) {
+              return false;
+            }
+
+            const htmlText = pEl.html() || "";
+            const plainText = pEl.text().trim();
+            if (plainText.includes("상세보기")) {
+              return false;
+            }
+
+            return htmlText.includes("<br") || plainText.length > 0;
+          })
+          .last() || null;
+
+      if (!detailParagraph) {
+        return { regular, simple, plus, image, kcal };
+      }
+
+      const detailHtml = detailParagraph.html() || "";
+      const lines = detailHtml
+        .split(/<br\s*\/?>/i)
+        .map((part) => cheerio.load(part).text().replaceAll(/\u00A0/g, " ").trim())
+        .filter(Boolean);
+
+      let section: "regular" | "plus" | "simple" = "regular";
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) {
+          continue;
         }
 
         if (line.includes("<셀프바>") || line.includes("<플러스바>")) {
-          const delimiter = line.includes("<셀프바>") ? "<셀프바>" : "<플러스바>";
-          const parts = line.split(delimiter);
-          if (parts.length > 1) {
-            const plusMealText = parts[1].trim();
-            plus = parseMenu(plusMealText);
+          section = "plus";
+          const marker = line.includes("<셀프바>") ? "<셀프바>" : "<플러스바>";
+          const tail = line.split(marker)[1]?.trim();
+          if (tail) {
+            plus.push(...parseMenu(tail));
           }
           continue;
         }
 
         if (line.includes("<간편식>")) {
-          const parts = line.split("<간편식>");
-          if (parts.length > 1) {
-            const simpleMealText = parts[1].trim();
-            simple = parseMenu(simpleMealText);
+          section = "simple";
+          const tail = line.split("<간편식>")[1]?.trim();
+          if (tail) {
+            simple.push(...parseMenu(tail));
           }
           continue;
         }
 
-        if (simple.length > 0 || plus.length > 0 || line === "") {
-          continue;
+        if (section === "regular") {
+          regular.push(...parseMenu(line));
+        } else if (section === "plus") {
+          plus.push(...parseMenu(line));
+        } else {
+          simple.push(...parseMenu(line));
         }
-        break;
       }
 
-      return { regular, simple, plus };
+      return { regular, simple, plus, image, kcal };
     };
 
-    for (let i = 0; i < contentLines.length; i++) {
-      const line = contentLines[i].replaceAll(/\u00A0/g, "").replaceAll(" ", "");
+    const mealTypeMap: Record<string, keyof ProcessedMealMenu> = {
+      [MEAL_TYPES.BREAKFAST]: "breakfast",
+      [MEAL_TYPES.LUNCH]: "lunch",
+      [MEAL_TYPES.DINNER]: "dinner",
+    };
 
-      if (line.startsWith(`*${MEAL_TYPES.BREAKFAST}`)) {
-        const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.BREAKFAST);
-        processedMenu.breakfast.regular = regular;
-        processedMenu.breakfast.simple = simple;
-        processedMenu.breakfast.plus = plus;
-      } else if (line.startsWith(`*${MEAL_TYPES.LUNCH}`)) {
-        const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.LUNCH);
-        processedMenu.lunch.regular = regular;
-        processedMenu.lunch.simple = simple;
-        processedMenu.lunch.plus = plus;
-      } else if (line.startsWith(`*${MEAL_TYPES.DINNER}`)) {
-        const { regular, simple, plus } = parseMealSection(contentLines, i, MEAL_TYPES.DINNER);
-        processedMenu.dinner.regular = regular;
-        processedMenu.dinner.simple = simple;
-        processedMenu.dinner.plus = plus;
+    const weekData: CafeteriaWeekData = {};
+    for (const { date } of dateColumns) {
+      if (!weekData[date]) {
+        weekData[date] = createEmptyDay();
       }
     }
 
-    $(".bbsV_cont img").each((_, element) => {
-      const imgSrc = $(element).attr("src");
-      const imgAlt = $(element).attr("alt")?.toLowerCase() || "";
+    $("tbody tr").each((_, row) => {
+      const rowEl = $(row);
+      const mealTypeText = rowEl.find("th").first().text().trim();
+      const mealKey = mealTypeMap[mealTypeText];
+      if (!mealKey) {
+        return;
+      }
 
-      if (imgSrc) {
-        try {
-          const fullUrl = new URL(imgSrc, KDMHS_WEBSITE.BASE_URL).toString();
-          if (imgAlt.includes("조")) processedMenu.breakfast.image = fullUrl;
-          else if (imgAlt.includes("중")) processedMenu.lunch.image = fullUrl;
-          else if (imgAlt.includes("석")) processedMenu.dinner.image = fullUrl;
-        } catch {
-          mealLogger.warn(`Failed to parse image URL: ${imgSrc}`);
+      const cells = rowEl.find("td").toArray();
+      for (const { cellIndex, date } of dateColumns) {
+        const targetCell = cells[cellIndex];
+        if (!targetCell) {
+          continue;
         }
+
+        if (!hasMeaningfulCellContent($(targetCell))) {
+          continue;
+        }
+
+        const parsed = parseMealCell($(targetCell));
+        if (!weekData[date]) {
+          weekData[date] = createEmptyDay();
+        }
+
+        weekData[date][mealKey] = {
+          regular: parsed.regular,
+          simple: parsed.simple,
+          plus: parsed.plus,
+          image: parsed.image,
+          kcal: parsed.kcal,
+        };
       }
     });
 
-    const result: CafeteriaData = {
-      breakfast: processedMenu.breakfast,
-      lunch: processedMenu.lunch,
-      dinner: processedMenu.dinner,
+    const isEmptyDay = (dayData: CafeteriaData): boolean => {
+      return (
+        dayData.breakfast.regular.length === 0 &&
+        dayData.breakfast.simple.length === 0 &&
+        dayData.breakfast.plus.length === 0 &&
+        dayData.lunch.regular.length === 0 &&
+        dayData.lunch.simple.length === 0 &&
+        dayData.lunch.plus.length === 0 &&
+        dayData.dinner.regular.length === 0 &&
+        dayData.dinner.simple.length === 0 &&
+        dayData.dinner.plus.length === 0
+      );
     };
 
-    const isAllMealsEmpty =
-      processedMenu.breakfast.regular.length === 0 &&
-      processedMenu.breakfast.simple.length === 0 &&
-      processedMenu.breakfast.plus.length === 0 &&
-      processedMenu.lunch.regular.length === 0 &&
-      processedMenu.lunch.simple.length === 0 &&
-      processedMenu.lunch.plus.length === 0 &&
-      processedMenu.dinner.regular.length === 0 &&
-      processedMenu.dinner.simple.length === 0 &&
-      processedMenu.dinner.plus.length === 0;
+    for (const { date } of dateColumns) {
+      const dayData = weekData[date] || createEmptyDay();
 
-    if (isAllMealsEmpty) {
-      const existingData = await db.getMealData<CafeteriaData>(dateKey);
-      if (existingData) {
-        mealLogger.info("All meals are empty, preserving existing data");
-        timer("Preserved existing meal data (empty refresh result)");
-        return existingData;
+      if (isEmptyDay(dayData)) {
+        const existingData = await db.getMealData<CafeteriaData>(date);
+        if (existingData) {
+          mealLogger.info(`All meals are empty for ${date}, preserving existing data`);
+          weekData[date] = existingData;
+          continue;
+        }
       }
+
+      await db.saveMealData(date, dayData);
+      weekData[date] = dayData;
     }
 
-    await db.saveMealData(dateKey, result, { documentId });
-    timer("Parsed and saved meal data");
+    timer(`Parsed and saved weekly meal data (${dateColumns.length} days)`);
 
-    return result;
+    return weekData;
   } catch (error) {
     logger.error(`Failed to get meal data for ${dateKey}`, error);
     throw error;
@@ -309,38 +375,6 @@ export async function getCafeteriaData(db: MongoDBService, dateParam: string): P
   }
 
   throw new MealNoOperationError();
-}
-
-export async function fetchAndSaveCafeteriaData(
-  db: MongoDBService,
-  dateParam: string,
-  menuPosts: MenuPost[],
-): Promise<CafeteriaData> {
-  const targetPost = findMenuPostForDate(menuPosts, dateParam);
-
-  if (!targetPost) {
-    const targetDate = new Date(dateParam);
-
-    const postDates = menuPosts
-      .map((post) => new Date(post.date))
-      .filter((date): date is Date => !Number.isNaN(date.getTime()))
-      .sort((a, b) => a.getTime() - b.getTime());
-
-    if (postDates.length === 0) {
-      throw new MealNotFoundError();
-    }
-
-    const earliestDate = postDates[0];
-    const latestDate = postDates[postDates.length - 1];
-
-    if (targetDate < earliestDate || targetDate > latestDate) {
-      throw new MealNotFoundError();
-    }
-
-    throw new MealNoOperationError();
-  }
-
-  return await getMealData(db, targetPost.documentId, dateParam);
 }
 
 export async function refreshSpecificDate(db: MongoDBService, dateParam: string): Promise<CafeteriaData> {
@@ -396,38 +430,28 @@ export async function runKdmhsRefresh(db: MongoDBService, refreshType: "today" |
   try {
     refreshLogger.info(`Starting KDMHS cafeteria data refresh (${refreshType})`);
 
-    const menuPosts = await getLatestMenuPosts();
+    const today = new Date();
+    const thisWeekStart = new Date(today);
+    thisWeekStart.setDate(today.getDate() - today.getDay());
+
+    const weekAnchors = [formatDate(thisWeekStart)];
+    if (refreshType === "all") {
+      const nextWeekStart = new Date(thisWeekStart);
+      nextWeekStart.setDate(thisWeekStart.getDate() + 7);
+      weekAnchors.push(formatDate(nextWeekStart));
+    }
+
     let successCount = 0;
     let errorCount = 0;
 
-    for (const post of menuPosts) {
+    for (const weekAnchor of weekAnchors) {
       try {
-        const postDate = new Date(post.date);
-        if (Number.isNaN(postDate.getTime())) {
-          refreshLogger.warn(`Invalid date: ${post.date} for ${post.title}`);
-          continue;
-        }
-
-        if (refreshType === "today") {
-          const today = new Date();
-          const isToday =
-            postDate.getDate() === today.getDate() &&
-            postDate.getMonth() === today.getMonth() &&
-            postDate.getFullYear() === today.getFullYear();
-
-          if (!isToday) {
-            continue;
-          }
-        }
-
-        const dateKey = formatDate(postDate);
-        refreshLogger.info(`Processing ${dateKey}`);
-        await fetchAndSaveCafeteriaData(db, dateKey, menuPosts);
-        refreshLogger.info(`✓ Completed ${dateKey}`);
+        const weekData = await getWeekMealData(db, weekAnchor);
+        refreshLogger.info(`✓ Parsed week ${weekAnchor} (${Object.keys(weekData).length} days)`);
         successCount++;
       } catch (error) {
         errorCount++;
-        refreshLogger.error(`✗ Failed ${post.title}`, error);
+        refreshLogger.error(`✗ Failed week ${weekAnchor}`, error);
       }
     }
 
