@@ -378,20 +378,19 @@ export async function getCafeteriaData(db: MongoDBService, dateParam: string): P
 }
 
 export async function refreshSpecificDate(db: MongoDBService, dateParam: string): Promise<CafeteriaData> {
-  const collection = db.getCollection<MealDataDocument>();
-  const document = await collection.findOne({ _id: dateParam }, { projection: { documentId: 1 } });
-  const documentId = document?.documentId || null;
+  const weekData = await getWeekMealData(db, dateParam);
+  const dayData = weekData[dateParam];
 
-  if (!documentId) {
+  if (!dayData) {
     throw new MealNotFoundError();
   }
 
-  return await getMealData(db, documentId, dateParam);
+  return dayData;
 }
 
 export async function searchLatestFoodImage(db: MongoDBService, foodName: string): Promise<FoodSearchResult | null> {
   const collection = db.getCollection<MealDataDocument>();
-  const regex = new RegExp(foodName, "i");
+  const regex = new RegExp(foodName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
   const mealTypes = ["breakfast", "lunch", "dinner"] as const;
 
