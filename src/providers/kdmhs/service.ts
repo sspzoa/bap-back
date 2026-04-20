@@ -90,8 +90,9 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
 
     const html = await fetchWithRetry<string>(url, {
       method: "POST",
-      body: {
-        "schDt": dateKey
+      body: new URLSearchParams({ schDt: dateKey }).toString(),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
       },
       parser: async (response) => response.text(),
     });
