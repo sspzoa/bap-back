@@ -41,4 +41,6 @@ export interface FoodSearchResult {
   image: string;
   date: string;
   mealType: "breakfast" | "lunch" | "dinner";
+  section: "regular" | "simple" | "plus";
+  menuName: string;
 }
