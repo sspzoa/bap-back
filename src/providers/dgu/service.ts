@@ -5,10 +5,10 @@ import type { MongoDBService } from "@/core/mongodb";
 import { DGU_WEBSITE } from "@/providers/dgu/config";
 import type { DguCafeteriaData, DguCategory, DguMealInfo, DguMenuItem } from "@/providers/dgu/types";
 import { dateToSday, formatDate, getWeekDates } from "@/utils/date";
-import { fetchWithRetry } from "@/utils/fetch";
+import { closeBrowser, fetchWithRetry } from "@/utils/fetch";
 
 const ORIGIN_PATTERN = /\([^)]*[:：][^)]*산[^)]*\)/g;
-const HOURS_PATTERN = /^\d{1,2}:\d{2}\s*[~～\-]/;
+const HOURS_PATTERN = /^\d{1,2}:\d{2}\s*[~～-]/;
 const HOURS_FULL_LINE = /^[\d:~～\-\s/()（）품절시까지]*$/;
 const WON_CATEGORY_PRICE = /^[￦₩]\s*([\d,]+)$/;
 const WON_SUFFIX_ONLY = /^([\d,]+)\s*원$/;
@@ -113,7 +113,7 @@ const CATEGORY_NAME_MAP: Record<string, string> = {
 };
 
 function refineCategoryName(category: DguCategory): DguCategory {
-  let name = CATEGORY_NAME_MAP[category.name] || category.name;
+  const name = CATEGORY_NAME_MAP[category.name] || category.name;
 
   const slots = [category.lunch, category.dinner];
 
@@ -265,5 +265,7 @@ export async function runDguRefresh(db: MongoDBService, refreshType: "today" | "
   } catch (error) {
     refreshLogger.error("DGU cafeteria refresh failed", error);
     throw error;
+  } finally {
+    await closeBrowser();
   }
 }

@@ -15,10 +15,7 @@ export function createDguProvider(): MealProvider {
 
     async init() {
       await db.connect();
-      await db.createIndexes([
-        { key: { createdAt: 1 } },
-        { key: { updatedAt: 1 } },
-      ]);
+      await db.createIndexes([{ key: { createdAt: 1 } }, { key: { updatedAt: 1 } }]);
     },
 
     async shutdown() {

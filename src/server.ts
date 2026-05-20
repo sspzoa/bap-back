@@ -1,7 +1,7 @@
 import { serve } from "bun";
 import { CONFIG } from "@/core/config";
 import { getCorsHeaders, handleCors } from "@/core/cors";
-import { ApiError, MealNoOperationError, MealNotFoundError, handleError } from "@/core/errors";
+import { ApiError, handleError, MealNoOperationError, MealNotFoundError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import type { SchedulerHandle } from "@/core/scheduler";
 import { setupScheduler } from "@/core/scheduler";
@@ -153,11 +153,7 @@ export async function createServer() {
     });
 
     for (const provider of providers) {
-      const handle = setupScheduler(
-        provider.config.id,
-        provider.config.schedule,
-        (type) => provider.runRefresh(type),
-      );
+      const handle = setupScheduler(provider.config.id, provider.config.schedule, (type) => provider.runRefresh(type));
       schedulerHandles.push(handle);
     }
 

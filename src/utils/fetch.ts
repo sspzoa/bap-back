@@ -12,20 +12,37 @@ function normalizeFullWidthCharacters(text: string): string {
 
 type BrowserInstance = Awaited<ReturnType<typeof Puppeteer.connect>>;
 let browserInstance: BrowserInstance | null = null;
+let browserConnectPromise: Promise<BrowserInstance> | null = null;
 
 async function getBrowser(): Promise<BrowserInstance> {
-  if (!browserInstance) {
+  if (browserInstance) {
+    return browserInstance;
+  }
+
+  if (!browserConnectPromise) {
     logger.info("Creating browser instance");
-    browserInstance = await Puppeteer.connect({
+    browserConnectPromise = Puppeteer.connect({
       apiKey: process.env.SCRAPELESS_API_KEY,
       session_name: "fetchWithPuppeteer",
       session_ttl: 10000,
       proxy_country: "ANY",
       session_recording: true,
       defaultViewport: null,
-    });
+    })
+      .then((browser) => {
+        browserInstance = browser;
+        return browser;
+      })
+      .catch((error) => {
+        browserInstance = null;
+        throw error;
+      })
+      .finally(() => {
+        browserConnectPromise = null;
+      });
   }
-  return browserInstance;
+
+  return browserConnectPromise;
 }
 
 export class HttpError extends Error {
@@ -107,7 +124,11 @@ async function fetchWithPuppeteer(
     fetchLogger.error(`Fetch failed: ${url}`, error);
     throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : "Unknown error"}`, url);
   } finally {
-    await page.close();
+    await page.close().catch((error) => {
+      fetchLogger.warn(`Failed to close page: ${url}`, {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    });
   }
 }
 
@@ -213,9 +234,17 @@ export async function fetchWithRetry<T>(
 export { normalizeFullWidthCharacters };
 
 export async function closeBrowser() {
-  if (browserInstance) {
+  const browser = browserInstance ?? (await browserConnectPromise?.catch(() => null));
+
+  browserConnectPromise = null;
+  browserInstance = null;
+
+  if (browser) {
     logger.info("Closing browser instance");
-    await browserInstance.close();
-    browserInstance = null;
+    await browser.close().catch((error) => {
+      logger.warn("Failed to close browser instance", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    });
   }
 }

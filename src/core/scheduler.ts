@@ -48,6 +48,7 @@ export function setupScheduler(
 
   let currentTimeout: NodeJS.Timeout | null = null;
   let cancelled = false;
+  let running = false;
 
   const scheduleInfo = schedule
     .map((s) => `day ${s.day} at ${s.hour}:${s.minute.toString().padStart(2, "0")} (${s.refreshType})`)
@@ -55,7 +56,21 @@ export function setupScheduler(
 
   logger.info(`[${providerId}] Setting up refresh job: ${scheduleInfo}`);
 
-  refreshFn("all").catch((error) => {
+  async function runRefresh(refreshType: "today" | "all", reason: "initial" | "scheduled"): Promise<void> {
+    if (running) {
+      logger.warn(`[${providerId}] Skipping ${reason} refresh because a refresh is already running`);
+      return;
+    }
+
+    running = true;
+    try {
+      await refreshFn(refreshType);
+    } finally {
+      running = false;
+    }
+  }
+
+  runRefresh("all", "initial").catch((error) => {
     logger.error(`[${providerId}] Initial refresh failed`, error);
   });
 
@@ -69,7 +84,7 @@ export function setupScheduler(
 
     currentTimeout = <NodeJS.Timeout>setTimeout(async () => {
       try {
-        await refreshFn(refreshType);
+        await runRefresh(refreshType, "scheduled");
       } catch (error) {
         logger.error(`[${providerId}] Scheduled refresh failed`, error);
       } finally {

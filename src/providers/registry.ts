@@ -14,10 +14,12 @@ class ProviderRegistry {
   }
 
   findByPath(path: string): MealProvider | undefined {
-    return this.providers
-      .filter((p) => p.config.basePath !== "" && path.startsWith(p.config.basePath))
-      .sort((a, b) => b.config.basePath.length - a.config.basePath.length)[0]
-      ?? this.providers.find((p) => p.config.basePath === "");
+    return (
+      this.providers
+        .filter((p) => p.config.basePath !== "" && path.startsWith(p.config.basePath))
+        .sort((a, b) => b.config.basePath.length - a.config.basePath.length)[0] ??
+      this.providers.find((p) => p.config.basePath === "")
+    );
   }
 
   getSubPath(provider: MealProvider, fullPath: string): string {

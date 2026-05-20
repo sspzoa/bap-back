@@ -1,11 +1,16 @@
+import { CONFIG } from "@/core/config";
 import { getCorsHeaders } from "@/core/cors";
 import { ApiError } from "@/core/errors";
 import { MongoDBService } from "@/core/mongodb";
-import { CONFIG } from "@/core/config";
 import { KDMHS_CONFIG } from "@/providers/kdmhs/config";
-import { getCafeteriaData, refreshSpecificDate, runKdmhsRefresh, searchLatestFoodImage } from "@/providers/kdmhs/service";
-import type { MealProvider } from "@/providers/types";
+import {
+  getCafeteriaData,
+  refreshSpecificDate,
+  runKdmhsRefresh,
+  searchLatestFoodImage,
+} from "@/providers/kdmhs/service";
 import type { CafeteriaData } from "@/providers/kdmhs/types";
+import type { MealProvider } from "@/providers/types";
 
 export function createKdmhsProvider(): MealProvider {
   const config = KDMHS_CONFIG;
@@ -17,11 +22,7 @@ export function createKdmhsProvider(): MealProvider {
 
     async init() {
       await db.connect();
-      await db.createIndexes([
-        { key: { documentId: 1 } },
-        { key: { createdAt: 1 } },
-        { key: { updatedAt: 1 } },
-      ]);
+      await db.createIndexes([{ key: { documentId: 1 } }, { key: { createdAt: 1 } }, { key: { updatedAt: 1 } }]);
     },
 
     async shutdown() {
@@ -59,9 +60,11 @@ export function createKdmhsProvider(): MealProvider {
             requestId,
             timestamp: new Date().toISOString(),
             foodName,
+            matchedMenu: result.menuName,
             image: result.image,
             date: result.date,
             mealType: result.mealType,
+            section: result.section,
           }),
           {
             headers: {

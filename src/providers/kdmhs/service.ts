@@ -1,43 +1,14 @@
 import * as cheerio from "cheerio";
+import type { AnyNode } from "domhandler";
 import { MealNoOperationError, MealNotFoundError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import type { MongoDBService } from "@/core/mongodb";
 import { KDMHS_WEBSITE, MEAL_TYPES } from "@/providers/kdmhs/config";
-import type { CafeteriaData, FoodSearchResult, MealDataDocument, MenuPost, ProcessedMealMenu } from "@/providers/kdmhs/types";
+import type { CafeteriaData, FoodSearchResult, MealDataDocument, ProcessedMealMenu } from "@/providers/kdmhs/types";
 import { formatDate } from "@/utils/date";
 import { closeBrowser, fetchWithRetry } from "@/utils/fetch";
-import { CafeteriaWeekData } from "./types";
-
-function calculateMenuDate(title: string, registrationDateStr: string): Date | null {
-  const monthDayMatch = title.match(/(\d{1,2})월\s*(\d{1,2})일/);
-  if (!monthDayMatch) return null;
-
-  const menuMonth = parseInt(monthDayMatch[1], 10);
-  const menuDay = parseInt(monthDayMatch[2], 10);
-
-  const registrationDate = new Date(registrationDateStr);
-  const registrationYear = registrationDate.getFullYear();
-  const registrationMonth = registrationDate.getMonth() + 1;
-
-  let menuYear = registrationYear;
-
-  if (registrationMonth === 12 && menuMonth === 1) {
-    menuYear = registrationYear + 1;
-  } else if (registrationMonth === 1 && menuMonth === 12) {
-    menuYear = registrationYear - 1;
-  }
-
-  return new Date(menuYear, menuMonth - 1, menuDay);
-}
-
-function findMenuPostForDate(menuPosts: MenuPost[], dateParam: string): MenuPost | undefined {
-  const targetDate = new Date(dateParam);
-  const targetDateStr = formatDate(targetDate);
-
-  return menuPosts.find((post) => {
-    return post.date === targetDateStr;
-  });
-}
+import { findLatestFoodMatch } from "./search";
+import type { CafeteriaWeekData } from "./types";
 
 const parseMenu = (menuStr: string): string[] => {
   if (!menuStr) return [];
@@ -106,7 +77,7 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
       dinner: createEmptyMeal(),
     });
 
-    const hasMeaningfulCellContent = (cell: cheerio.Cheerio<cheerio.Element>): boolean => {
+    const hasMeaningfulCellContent = (cell: cheerio.Cheerio<AnyNode>): boolean => {
       const detailParagraph = cell
         .find("p")
         .filter((_, p) => {
@@ -138,10 +109,7 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
       });
 
     const resolveDateColumns = (): Array<{ cellIndex: number; date: string }> => {
-      const headerCells = $("thead tr")
-        .last()
-        .find("th, td")
-        .toArray();
+      const headerCells = $("thead tr").last().find("th, td").toArray();
 
       const columns = headerCells
         .map((cell, headerIndex) => {
@@ -179,7 +147,7 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
 
     const dateColumns = resolveDateColumns();
 
-    const parseMealCell = (cell: cheerio.Cheerio<cheerio.Element>) => {
+    const parseMealCell = (cell: cheerio.Cheerio<AnyNode>) => {
       const regular: string[] = [];
       const simple: string[] = [];
       const plus: string[] = [];
@@ -225,7 +193,13 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
       const detailHtml = detailParagraph.html() || "";
       const lines = detailHtml
         .split(/<br\s*\/?>/i)
-        .map((part) => cheerio.load(part).text().replaceAll(/\u00A0/g, " ").trim())
+        .map((part) =>
+          cheerio
+            .load(part)
+            .text()
+            .replaceAll(/\u00A0/g, " ")
+            .trim(),
+        )
         .filter(Boolean);
 
       let section: "regular" | "plus" | "simple" = "regular";
@@ -280,12 +254,11 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
       }
     }
 
-    $("tbody tr").each((_, row) => {
-      const rowEl = $(row);
+    for (const rowEl of mealRows) {
       const mealTypeText = rowEl.find("th").first().text().trim();
       const mealKey = mealTypeMap[mealTypeText];
       if (!mealKey) {
-        return;
+        continue;
       }
 
       const cells = rowEl.find("td").toArray();
@@ -312,7 +285,7 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
           kcal: parsed.kcal,
         };
       }
-    });
+    }
 
     const isEmptyDay = (dayData: CafeteriaData): boolean => {
       return (
@@ -391,36 +364,8 @@ export async function refreshSpecificDate(db: MongoDBService, dateParam: string)
 
 export async function searchLatestFoodImage(db: MongoDBService, foodName: string): Promise<FoodSearchResult | null> {
   const collection = db.getCollection<MealDataDocument>();
-  const regex = new RegExp(foodName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-
-  const mealTypes = ["breakfast", "lunch", "dinner"] as const;
-
-  for (const mealType of mealTypes) {
-    const result = await collection.findOne(
-      {
-        $and: [
-          {
-            $or: [
-              { [`data.${mealType}.regular`]: { $elemMatch: { $regex: regex } } },
-              { [`data.${mealType}.simple`]: { $elemMatch: { $regex: regex } } },
-            ],
-          },
-          { [`data.${mealType}.image`]: { $ne: "" } },
-        ],
-      },
-      { sort: { _id: -1 } },
-    );
-
-    if (result) {
-      return {
-        image: result.data[mealType].image,
-        date: result._id,
-        mealType,
-      };
-    }
-  }
-
-  return null;
+  const documents = await collection.find({}).sort({ _id: -1 }).toArray();
+  return findLatestFoodMatch(documents, foodName);
 }
 
 export async function runKdmhsRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {
