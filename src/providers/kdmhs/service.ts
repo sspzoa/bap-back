@@ -364,8 +364,12 @@ export async function refreshSpecificDate(db: MongoDBService, dateParam: string)
 
 export async function searchLatestFoodImage(db: MongoDBService, foodName: string): Promise<FoodSearchResult | null> {
   const collection = db.getCollection<MealDataDocument>();
-  const documents = await collection.find({}).sort({ _id: -1 }).toArray();
-  return findLatestFoodMatch(documents, foodName);
+  const today = formatDate(new Date());
+  const documents = await collection
+    .find({ _id: { $lt: today } })
+    .sort({ _id: -1 })
+    .toArray();
+  return findLatestFoodMatch(documents, foodName, { excludeDate: today });
 }
 
 export async function runKdmhsRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {
