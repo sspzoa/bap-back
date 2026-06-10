@@ -64,7 +64,7 @@ export async function getDguMenu(db: MongoDBService, dateParam: string): Promise
     return cachedData;
   }
 
-  throw new MealNotFoundError();
+  throw new MealNotFoundError("학식 정보가 없어요");
 }
 
 export async function refreshDguMenu(db: MongoDBService, dateParam: string): Promise<DguMenu> {

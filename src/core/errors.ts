@@ -13,7 +13,7 @@ export class ApiError extends Error {
 }
 
 export class MealNotFoundError extends Error {
-  constructor(message = "급식 정보가 없어요") {
+  constructor(message = "정보가 없어요") {
     super(message);
     this.name = "MealNotFoundError";
   }

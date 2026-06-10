@@ -65,14 +65,14 @@ const MENU_TOOL: Anthropic.Tool = {
                   },
                   corners: {
                     type: "array",
-                    description: "해당 식사 시간의 코너 목록 (중식: 반식/특식, 석식: 단일)",
+                    description: "해당 식사 시간의 코너 목록 (중식: 일반식/특식, 석식: 단일)",
                     items: {
                       type: "object",
                       additionalProperties: false,
                       properties: {
                         name: {
                           type: "string",
-                          description: "코너 이름 (예: '반식(A코너)', '특식(B코너)', '석식')",
+                          description: "코너 이름 (예: '일반식(A코너)', '특식(B코너)', '석식')",
                         },
                         price: {
                           type: "string",
@@ -105,7 +105,7 @@ function buildPrompt(expectedDates: { date: string; weekday: string }[]): string
   return [
     "이 이미지는 동국대학교 경영관 D-Flex 식당의 한 주간 식단표입니다.",
     "표의 가로(열)는 요일, 세로(행)는 식사 시간(중식·석식)과 코너입니다.",
-    "중식은 보통 '반식(A코너)'과 '특식(B코너)' 두 코너, 석식은 단일 코너입니다.",
+    "중식은 보통 '일반식(A코너)'과 '특식(B코너)' 두 코너, 석식은 단일 코너입니다.",
     "각 칸에는 대표 메뉴, 그 아래 품목들이 들어 있고, 행 라벨 쪽에 코너 가격과 운영 시간이 있습니다.",
     "",
     "아래 날짜들이 이 표의 각 요일 열에 순서대로 대응됩니다. 각 날짜마다 그 열의 중식·석식과 모든 코너를 추출하세요:",
@@ -113,7 +113,7 @@ function buildPrompt(expectedDates: { date: string; weekday: string }[]): string
     "",
     "규칙:",
     "- meals[].time 은 '중식' 또는 '석식'.",
-    "- corners[].name 은 코너 이름만 (예: '반식(A코너)', '특식(B코너)', '석식').",
+    "- corners[].name 은 코너 이름만 (예: '일반식(A코너)', '특식(B코너)', '석식').",
     "- corners[].items 에는 음식 이름만 넣고 가격(원/₩)·원산지·운영시간·빈 줄은 제외. 대표 메뉴를 맨 앞에.",
     "- price 는 숫자와 콤마만 (예: '6,500'). 없으면 빈 문자열 ''.",
     "- operatingHours 는 해당 식사 시간의 운영 시간 (예: '11:30~14:00'). 없으면 빈 문자열 ''.",
