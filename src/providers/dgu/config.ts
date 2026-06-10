@@ -8,25 +8,8 @@ export const DGU_CONFIG: ProviderConfig = {
   dbName: "dgu-bap",
   collection: "meal_data",
   schedule: [
-    { day: 0, hour: 3, minute: 0, refreshType: "all" },
-    { day: 0, hour: 10, minute: 30, refreshType: "today" },
-    { day: 1, hour: 3, minute: 0, refreshType: "all" },
-    { day: 1, hour: 10, minute: 30, refreshType: "today" },
-    { day: 1, hour: 16, minute: 0, refreshType: "today" },
-    { day: 2, hour: 3, minute: 0, refreshType: "all" },
-    { day: 2, hour: 10, minute: 30, refreshType: "today" },
-    { day: 2, hour: 16, minute: 0, refreshType: "today" },
-    { day: 3, hour: 3, minute: 0, refreshType: "all" },
-    { day: 3, hour: 10, minute: 30, refreshType: "today" },
-    { day: 3, hour: 16, minute: 0, refreshType: "today" },
-    { day: 4, hour: 3, minute: 0, refreshType: "all" },
-    { day: 4, hour: 10, minute: 30, refreshType: "today" },
-    { day: 4, hour: 16, minute: 0, refreshType: "today" },
-    { day: 5, hour: 3, minute: 0, refreshType: "all" },
-    { day: 5, hour: 10, minute: 30, refreshType: "today" },
-    { day: 5, hour: 16, minute: 0, refreshType: "today" },
+    // 주간 식단표는 한 번 게시되면 거의 바뀌지 않으므로 토요일 새벽 3시에 주 1회만 전체 OCR.
     { day: 6, hour: 3, minute: 0, refreshType: "all" },
-    { day: 6, hour: 10, minute: 30, refreshType: "today" },
   ],
 };
 
