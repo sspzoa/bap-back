@@ -14,12 +14,12 @@ export const CONFIG = {
   },
   MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017",
   REFRESH_API_KEY: process.env.REFRESH_API_KEY || "",
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
   HTTP: {
     RETRY: {
       COUNT: 3,
       BASE_DELAY: 2000,
     },
-    USE_PUPPETEER: false,
   },
 } as const;
 

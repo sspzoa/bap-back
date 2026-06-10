@@ -5,7 +5,7 @@ export const KDMHS_CONFIG: ProviderConfig = {
   name: "한국디지털미디어고등학교",
   basePath: "",
   origins: ["https://xn--rh3b.net", "https://밥.net"],
-  dbName: process.env.MONGODB_DB_NAME || "mongo_db_name",
+  dbName: "bap",
   collection: "meal_data",
   schedule: [
     { day: 0, hour: 3, minute: 0, refreshType: "all" },

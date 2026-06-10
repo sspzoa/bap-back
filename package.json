@@ -10,10 +10,9 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@scrapeless-ai/sdk": "^1.5.1",
+    "@anthropic-ai/sdk": "^0.104.1",
     "cheerio": "^1.0.0",
-    "mongodb": "^6.17.0",
-    "puppeteer-core": "^24.10.2"
+    "mongodb": "^6.17.0"
   },
   "scripts": {
     "start": "bun src/index.ts",

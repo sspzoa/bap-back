@@ -6,7 +6,7 @@ import type { MongoDBService } from "@/core/mongodb";
 import { KDMHS_WEBSITE, MEAL_TYPES } from "@/providers/kdmhs/config";
 import type { CafeteriaData, FoodSearchResult, MealDataDocument, ProcessedMealMenu } from "@/providers/kdmhs/types";
 import { formatDate } from "@/utils/date";
-import { closeBrowser, fetchWithRetry } from "@/utils/fetch";
+import { fetchWithRetry } from "@/utils/fetch";
 import { findLatestFoodMatch } from "./search";
 import type { CafeteriaWeekData } from "./types";
 
@@ -408,7 +408,5 @@ export async function runKdmhsRefresh(db: MongoDBService, refreshType: "today" |
   } catch (error) {
     refreshLogger.error("KDMHS cafeteria refresh failed", error);
     throw error;
-  } finally {
-    await closeBrowser();
   }
 }

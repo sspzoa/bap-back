@@ -1,49 +1,5 @@
-import { createPuppeteerCDPSession, Puppeteer } from "@scrapeless-ai/sdk";
 import { CONFIG } from "@/core/config";
 import { logger } from "@/core/logger";
-
-function normalizeFullWidthCharacters(text: string): string {
-  return text
-    .replace(/[\uFF01-\uFF5E]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
-    .replace(/\u3000/g, " ")
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201C\u201D]/g, '"');
-}
-
-type BrowserInstance = Awaited<ReturnType<typeof Puppeteer.connect>>;
-let browserInstance: BrowserInstance | null = null;
-let browserConnectPromise: Promise<BrowserInstance> | null = null;
-
-async function getBrowser(): Promise<BrowserInstance> {
-  if (browserInstance) {
-    return browserInstance;
-  }
-
-  if (!browserConnectPromise) {
-    logger.info("Creating browser instance");
-    browserConnectPromise = Puppeteer.connect({
-      apiKey: process.env.SCRAPELESS_API_KEY,
-      session_name: "fetchWithPuppeteer",
-      session_ttl: 10000,
-      proxy_country: "ANY",
-      session_recording: true,
-      defaultViewport: null,
-    })
-      .then((browser) => {
-        browserInstance = browser;
-        return browser;
-      })
-      .catch((error) => {
-        browserInstance = null;
-        throw error;
-      })
-      .finally(() => {
-        browserConnectPromise = null;
-      });
-  }
-
-  return browserConnectPromise;
-}
 
 export class HttpError extends Error {
   constructor(
@@ -53,82 +9,6 @@ export class HttpError extends Error {
   ) {
     super(message);
     this.name = "HttpError";
-  }
-}
-
-async function fetchWithPuppeteer(
-  url: string,
-  options: RequestInit & { method?: string; timeout?: number; solveCaptcha?: boolean; body?: any } = {},
-): Promise<Response> {
-  const { solveCaptcha = false } = options;
-  const isPost = (options.method || "GET").toUpperCase() === "POST";
-  const browser = await getBrowser();
-  const page = await browser.newPage();
-  const fetchLogger = logger.operation("fetch");
-
-  try {
-    let content: string;
-
-    if (isPost) {
-      content = await page.evaluate(
-        async (fetchUrl: string, fetchBody: string, fetchHeaders: Record<string, string>) => {
-          const res = await fetch(fetchUrl, {
-            method: "POST",
-            body: fetchBody,
-            headers: fetchHeaders,
-          });
-          return res.text();
-        },
-        url,
-        (options.body as string) || "",
-        (options.headers as Record<string, string>) || {},
-      );
-    } else {
-      await page.goto(url, { waitUntil: "networkidle2" });
-
-      if (solveCaptcha) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const cdpSession = await createPuppeteerCDPSession(page as any);
-          await cdpSession.waitCaptchaDetected();
-          fetchLogger.info("Solving captcha");
-          await cdpSession.solveCaptcha();
-          await cdpSession.waitCaptchaSolved();
-          fetchLogger.info("Captcha solved");
-          await page.waitForNavigation({ waitUntil: "networkidle2" }).catch(() => {});
-        } catch {
-          // No captcha detected
-        }
-      }
-
-      content = await page.content();
-    }
-
-    const normalizedContent = normalizeFullWidthCharacters(content);
-
-    return {
-      ok: true,
-      status: 200,
-      statusText: "OK",
-      headers: new Headers(),
-      url,
-      json: async () => JSON.parse(normalizedContent),
-      text: async () => normalizedContent,
-      blob: async () => new Blob([normalizedContent]),
-      arrayBuffer: async () => new TextEncoder().encode(normalizedContent).buffer,
-      clone: function () {
-        return { ...this };
-      },
-    } as Response;
-  } catch (error) {
-    fetchLogger.error(`Fetch failed: ${url}`, error);
-    throw new HttpError(500, `Fetch failed: ${error instanceof Error ? error.message : "Unknown error"}`, url);
-  } finally {
-    await page.close().catch((error) => {
-      fetchLogger.warn(`Failed to close page: ${url}`, {
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    });
   }
 }
 
@@ -172,16 +52,6 @@ async function fetchWithNative(
   }
 }
 
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit & { method?: string; timeout?: number; solveCaptcha?: boolean; body?: any } = {},
-): Promise<Response> {
-  if (CONFIG.HTTP.USE_PUPPETEER) {
-    return fetchWithPuppeteer(url, options);
-  }
-  return fetchWithNative(url, options);
-}
-
 export async function fetchWithRetry<T>(
   url: string,
   options: RequestInit & {
@@ -189,7 +59,6 @@ export async function fetchWithRetry<T>(
     timeout?: number;
     retries?: number;
     baseDelay?: number;
-    solveCaptcha?: boolean;
     parser?: (response: Response) => Promise<T>;
     body?: any;
   } = {},
@@ -197,7 +66,6 @@ export async function fetchWithRetry<T>(
   const {
     retries = CONFIG.HTTP.RETRY.COUNT,
     baseDelay = CONFIG.HTTP.RETRY.BASE_DELAY,
-    solveCaptcha = false,
     parser = (response) => response.json() as Promise<T>,
     ...fetchOptions
   } = options;
@@ -213,10 +81,7 @@ export async function fetchWithRetry<T>(
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
-      const response = await fetchWithTimeout(url, {
-        ...fetchOptions,
-        solveCaptcha: CONFIG.HTTP.USE_PUPPETEER ? solveCaptcha : false,
-      });
+      const response = await fetchWithNative(url, fetchOptions);
       return await parser(response);
     } catch (error) {
       lastError = error as Error;
@@ -229,22 +94,4 @@ export async function fetchWithRetry<T>(
 
   retryLogger.error(`All retries failed for ${url}`);
   throw lastError || new Error(`Failed to fetch ${url} after ${retries + 1} attempts`);
-}
-
-export { normalizeFullWidthCharacters };
-
-export async function closeBrowser() {
-  const browser = browserInstance ?? (await browserConnectPromise?.catch(() => null));
-
-  browserConnectPromise = null;
-  browserInstance = null;
-
-  if (browser) {
-    logger.info("Closing browser instance");
-    await browser.close().catch((error) => {
-      logger.warn("Failed to close browser instance", {
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    });
-  }
 }

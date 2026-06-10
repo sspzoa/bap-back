@@ -2,10 +2,10 @@ import type { ProviderConfig } from "@/providers/types";
 
 export const DGU_CONFIG: ProviderConfig = {
   id: "dgu",
-  name: "동국대학교",
+  name: "동국대학교 경영관 D-Flex",
   basePath: "/dgu",
-  origins: ["https://xn--3o2bl7m86e.xn--rh3b.net", "https://상록원.밥.net"],
-  dbName: process.env.DGU_MONGODB_DB_NAME || "dgu-bap",
+  origins: ["https://dflex.xn--rh3b.net", "https://dflex.밥.net"],
+  dbName: "dgu-bap",
   collection: "meal_data",
   schedule: [
     { day: 0, hour: 3, minute: 0, refreshType: "all" },
@@ -30,11 +30,10 @@ export const DGU_CONFIG: ProviderConfig = {
   ],
 };
 
-export const DGU_WEBSITE = {
-  BASE_URL: "https://dgucoop.dongguk.edu/mobile",
-  RESTAURANTS: [
-    { id: "1F", name: "1층", code: 7 },
-    { id: "2F", name: "2층", code: 1 },
-    { id: "3F", name: "3층", code: 5 },
-  ],
+export const DFLEX_WEBSITE = {
+  BASE_URL: "https://www.dongguk.edu",
+  LIST_PATH: "/article/FOODDFLEX/list",
+  DETAIL_PATH: "/article/FOODDFLEX/detail",
+  RESTAURANT_ID: "dflex",
+  RESTAURANT_NAME: "경영관 D-Flex",
 } as const;

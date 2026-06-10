@@ -3,8 +3,8 @@ WORKDIR /app
 
 ENV TZ=Asia/Seoul
 
-COPY package.json ./
-RUN bun install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
 COPY . .
 
