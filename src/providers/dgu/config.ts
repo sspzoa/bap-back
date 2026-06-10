@@ -34,6 +34,4 @@ export const DFLEX_WEBSITE = {
   BASE_URL: "https://www.dongguk.edu",
   LIST_PATH: "/article/FOODDFLEX/list",
   DETAIL_PATH: "/article/FOODDFLEX/detail",
-  RESTAURANT_ID: "dflex",
-  RESTAURANT_NAME: "경영관 D-Flex",
 } as const;

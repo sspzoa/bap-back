@@ -1,7 +1,6 @@
 import { MealNotFoundError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import type { MongoDBService } from "@/core/mongodb";
-import { DFLEX_WEBSITE } from "@/providers/dgu/config";
 import { extractWeeklyMenu } from "@/providers/dgu/ocr";
 import {
   type DflexArticle,
@@ -11,19 +10,13 @@ import {
   fetchImage,
   findArticleForDate,
 } from "@/providers/dgu/scrape";
-import type { DguCafeteriaData, DguCategory } from "@/providers/dgu/types";
+import type { DguMenu } from "@/providers/dgu/types";
 import { formatDate, getWeekDates } from "@/utils/date";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
-function emptyData(): DguCafeteriaData {
-  return { restaurants: [] };
-}
-
-function buildCafeteriaData(categories: DguCategory[]): DguCafeteriaData {
-  return {
-    restaurants: [{ id: DFLEX_WEBSITE.RESTAURANT_ID, name: DFLEX_WEBSITE.RESTAURANT_NAME, categories }],
-  };
+function emptyMenu(): DguMenu {
+  return { meals: [] };
 }
 
 function weekdayLabel(dateStr: string): string {
@@ -33,21 +26,18 @@ function weekdayLabel(dateStr: string): string {
 
 /**
  * Fetch the article's menu image, OCR the whole week in one call, and persist
- * one document per operating day. Returns the per-date data that was saved.
+ * one document per operating day. Returns the per-date menu that was saved.
  */
-async function refreshWeekFromArticle(
-  db: MongoDBService,
-  article: DflexArticle,
-): Promise<Map<string, DguCafeteriaData>> {
+async function refreshWeekFromArticle(db: MongoDBService, article: DflexArticle): Promise<Map<string, DguMenu>> {
   const refreshLogger = logger.operation("dgu-refresh-week");
   const dates = enumerateWeekdays(article.weekStart, article.weekEnd);
-  const result = new Map<string, DguCafeteriaData>();
+  const result = new Map<string, DguMenu>();
 
   const imageUrl = await fetchArticleImageUrl(article.seq);
   if (!imageUrl) {
     refreshLogger.warn(`No menu image found for article ${article.seq} (${article.title})`);
     for (const date of dates) {
-      const data = emptyData();
+      const data = emptyMenu();
       await db.saveMealData(date, data);
       result.set(date, data);
     }
@@ -56,21 +46,20 @@ async function refreshWeekFromArticle(
 
   const image = await fetchImage(imageUrl);
   const expectedDates = dates.map((date) => ({ date, weekday: weekdayLabel(date) }));
-  const menuByDate = await extractWeeklyMenu(image, expectedDates);
+  const mealsByDate = await extractWeeklyMenu(image, expectedDates);
 
   for (const date of dates) {
-    const categories = menuByDate.get(date) ?? [];
-    const data = buildCafeteriaData(categories);
+    const data: DguMenu = { meals: mealsByDate.get(date) ?? [] };
     await db.saveMealData(date, data);
     result.set(date, data);
-    refreshLogger.info(`Saved D-Flex ${date}: ${categories.length} categories`);
+    refreshLogger.info(`Saved D-Flex ${date}: ${data.meals.length} meals`);
   }
 
   return result;
 }
 
-export async function getDguCafeteriaData(db: MongoDBService, dateParam: string): Promise<DguCafeteriaData> {
-  const cachedData = await db.getMealData<DguCafeteriaData>(dateParam);
+export async function getDguMenu(db: MongoDBService, dateParam: string): Promise<DguMenu> {
+  const cachedData = await db.getMealData<DguMenu>(dateParam);
   if (cachedData) {
     return cachedData;
   }
@@ -78,18 +67,18 @@ export async function getDguCafeteriaData(db: MongoDBService, dateParam: string)
   throw new MealNotFoundError();
 }
 
-export async function refreshDguCafeteriaData(db: MongoDBService, dateParam: string): Promise<DguCafeteriaData> {
+export async function refreshDguMenu(db: MongoDBService, dateParam: string): Promise<DguMenu> {
   const articles = await fetchArticleList();
   const article = findArticleForDate(articles, dateParam);
 
   if (!article) {
-    const data = emptyData();
+    const data = emptyMenu();
     await db.saveMealData(dateParam, data);
     return data;
   }
 
   const weekData = await refreshWeekFromArticle(db, article);
-  return weekData.get(dateParam) ?? emptyData();
+  return weekData.get(dateParam) ?? emptyMenu();
 }
 
 export async function runDguRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {

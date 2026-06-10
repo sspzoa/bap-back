@@ -1,8 +1,8 @@
 import { CONFIG } from "@/core/config";
 import { MongoDBService } from "@/core/mongodb";
 import { DGU_CONFIG } from "@/providers/dgu/config";
-import { getDguCafeteriaData, refreshDguCafeteriaData, runDguRefresh } from "@/providers/dgu/service";
-import type { DguCafeteriaData } from "@/providers/dgu/types";
+import { getDguMenu, refreshDguMenu, runDguRefresh } from "@/providers/dgu/service";
+import type { DguMenu } from "@/providers/dgu/types";
 import type { MealProvider } from "@/providers/types";
 
 export function createDguProvider(): MealProvider {
@@ -22,12 +22,12 @@ export function createDguProvider(): MealProvider {
       await db.disconnect();
     },
 
-    async getMealData(date: string): Promise<DguCafeteriaData> {
-      return getDguCafeteriaData(db, date);
+    async getMealData(date: string): Promise<DguMenu> {
+      return getDguMenu(db, date);
     },
 
-    async refreshMealData(date: string): Promise<DguCafeteriaData> {
-      return refreshDguCafeteriaData(db, date);
+    async refreshMealData(date: string): Promise<DguMenu> {
+      return refreshDguMenu(db, date);
     },
 
     async getStats() {
