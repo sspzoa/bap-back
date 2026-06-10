@@ -24,9 +24,17 @@ export function findLatestFoodMatch(
 
     for (const mealType of MEAL_TYPES) {
       const meal = document.data[mealType];
+      if (!meal) {
+        continue;
+      }
 
       for (const section of MENU_SECTIONS) {
-        const menuName = meal[section].find((name) => normalizeSearchText(name).includes(query));
+        const menuNames = meal[section];
+        if (!Array.isArray(menuNames)) {
+          continue;
+        }
+
+        const menuName = menuNames.find((name) => normalizeSearchText(name).includes(query));
 
         if (menuName) {
           return {
