@@ -8,6 +8,7 @@ on:
 env:
   DOCKER_IMAGE: ghcr.io/${{ github.repository }}
   VERSION: ${{ github.sha }}
+  NAME: ${{ github.repository_id }}
 
 jobs:
   build:
@@ -31,34 +32,31 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
       - name: Build and Push Docker Image
+        id: docker_build
         uses: docker/build-push-action@v5
         with:
           builder: ${{ steps.buildx.outputs.name }}
           push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE }}:latest
-            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          tags: ${{ env.DOCKER_IMAGE }}:latest
 
   deploy:
     needs: build
-    name: Deploy to Colossus
-    runs-on: [self-hosted, colossus]
+    name: Deploy
+    runs-on: [ self-hosted ]
     steps:
-      - name: Write env and deploy
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          REFRESH_API_KEY: ${{ secrets.REFRESH_API_KEY }}
-          MINDLOGIC_KEY: ${{ secrets.MINDLOGIC_KEY }}
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Docker Run
         run: |
-          set -euo pipefail
-          umask 077
-          {
-            echo "MONGODB_URI=${MONGODB_URI}"
-            echo "REFRESH_API_KEY=${REFRESH_API_KEY}"
-            echo "MINDLOGIC_KEY=${MINDLOGIC_KEY}"
-            echo "NODE_ENV=production"
-            echo "IMAGE_TAG=latest"
-          } > /opt/bap-back/.env
-          chmod 600 /opt/bap-back/.env
-          cd /opt/bap-back
-          /opt/bap-back/scripts/deploy.sh
+          docker stop bap-back || true
+          docker rm bap-back || true
+          docker rmi ${{ env.DOCKER_IMAGE }}:latest || true
+          docker run -d -p 14741:3000 --name bap-back --restart always \
+            -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+            -e REFRESH_API_KEY=${{ secrets.REFRESH_API_KEY }} \
+            -e MINDLOGIC_KEY=${{ secrets.MINDLOGIC_KEY }} \
+            ${{ env.DOCKER_IMAGE }}:latest
