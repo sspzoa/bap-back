@@ -44,7 +44,7 @@ jobs:
     name: Deploy to Colossus
     runs-on: [self-hosted, colossus]
     steps:
-      - name: Write env and start blue
+      - name: Write env and deploy
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           REFRESH_API_KEY: ${{ secrets.REFRESH_API_KEY }}
