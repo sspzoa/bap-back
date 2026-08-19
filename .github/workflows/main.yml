@@ -61,15 +61,4 @@ jobs:
           } > /opt/bap-back/.env
           chmod 600 /opt/bap-back/.env
           cd /opt/bap-back
-          sudo docker compose pull app-blue
-          sudo docker compose up -d --force-recreate app-blue
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8081/health >/dev/null; then
-              echo "blue healthy"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "blue failed health"
-          sudo docker compose logs --tail=80 app-blue
-          exit 1
+          /opt/bap-back/scripts/deploy.sh
