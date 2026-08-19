@@ -1,0 +1,39 @@
+name: Colossus deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Colossus
+    runs-on: [self-hosted, colossus]
+    steps:
+      - name: Write env and start blue
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          REFRESH_API_KEY: ${{ secrets.REFRESH_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          {
+            echo "MONGODB_URI=${MONGODB_URI}"
+            echo "REFRESH_API_KEY=${REFRESH_API_KEY}"
+            echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
+            echo "NODE_ENV=production"
+            echo "IMAGE_TAG=latest"
+          } > /opt/bap-back/.env
+          chmod 600 /opt/bap-back/.env
+          cd /opt/bap-back
+          sudo docker compose pull app-blue || true
+          sudo docker compose up -d app-blue
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8081/health >/dev/null; then
+              echo "blue healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "blue failed health"
+          sudo docker compose logs --tail=80 app-blue
+          exit 1
