@@ -14,7 +14,7 @@ export const CONFIG = {
   },
   MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017",
   REFRESH_API_KEY: process.env.REFRESH_API_KEY || "",
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+  MINDLOGIC_KEY: process.env.MINDLOGIC_KEY || "",
   HTTP: {
     RETRY: {
       COUNT: 3,

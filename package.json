@@ -10,9 +10,9 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.104.1",
     "cheerio": "^1.2.0",
-    "mongodb": "^6.21.0"
+    "mongodb": "^6.21.0",
+    "openai": "^7.5.0"
   },
   "scripts": {
     "start": "bun src/index.ts",

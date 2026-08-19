@@ -1,12 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { CONFIG } from "@/core/config";
 import type { MenuImage } from "@/providers/dgu/scrape";
 import type { DguMeal } from "@/providers/dgu/types";
 
-// 마인드로직(동국대) 게이트웨이의 Anthropic-native 엔드포인트로 고정.
-const GATEWAY_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway/claude";
+// 마인드로직(동국대) 게이트웨이의 OpenAI Chat Completions 엔드포인트로 고정.
+const GATEWAY_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway";
 // 게이트웨이가 허용하는 모델만 사용 가능 (GET /v1/gateway/models/ 로 확인).
-const OCR_MODEL = "claude-opus-4-8";
+const OCR_MODEL = "gpt-5.6-luna";
 const TOOL_NAME = "submit_weekly_menu";
 
 interface OcrCorner {
@@ -35,68 +35,71 @@ function emptyToNull(value: string): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-const MENU_TOOL: Anthropic.Tool = {
-  name: TOOL_NAME,
-  description: "동국대학교 경영관 D-Flex 식당의 주간 식단표 이미지에서 추출한 메뉴를 날짜별로 제출합니다.",
-  strict: true,
-  input_schema: {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      days: {
-        type: "array",
-        description: "요청된 각 날짜별 메뉴",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            date: { type: "string", description: "YYYY-MM-DD 형식의 날짜" },
-            meals: {
-              type: "array",
-              description: "식사 시간 목록 (중식, 석식)",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  time: { type: "string", description: "식사 시간 이름 — '중식' 또는 '석식'" },
-                  operatingHours: {
-                    type: "string",
-                    description: "운영 시간 (예: '11:30~14:00'). 표기가 없으면 빈 문자열 ''",
-                  },
-                  corners: {
-                    type: "array",
-                    description: "해당 식사 시간의 코너 목록 (중식: 일반식/특식, 석식: 단일)",
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      properties: {
-                        name: {
-                          type: "string",
-                          description: "코너 이름 (예: '일반식(A코너)', '특식(B코너)', '석식')",
+const MENU_TOOL: OpenAI.Chat.ChatCompletionFunctionTool = {
+  type: "function",
+  function: {
+    name: TOOL_NAME,
+    description: "동국대학교 경영관 D-Flex 식당의 주간 식단표 이미지에서 추출한 메뉴를 날짜별로 제출합니다.",
+    strict: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        days: {
+          type: "array",
+          description: "요청된 각 날짜별 메뉴",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              date: { type: "string", description: "YYYY-MM-DD 형식의 날짜" },
+              meals: {
+                type: "array",
+                description: "식사 시간 목록 (중식, 석식)",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    time: { type: "string", description: "식사 시간 이름 — '중식' 또는 '석식'" },
+                    operatingHours: {
+                      type: "string",
+                      description: "운영 시간 (예: '11:30~14:00'). 표기가 없으면 빈 문자열 ''",
+                    },
+                    corners: {
+                      type: "array",
+                      description: "해당 식사 시간의 코너 목록 (중식: 일반식/특식, 석식: 단일)",
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                          name: {
+                            type: "string",
+                            description: "코너 이름 (예: '일반식(A코너)', '특식(B코너)', '석식')",
+                          },
+                          price: {
+                            type: "string",
+                            description: "코너 가격, 숫자와 콤마만 (예: '6,500'). 표기가 없으면 빈 문자열 ''",
+                          },
+                          items: {
+                            type: "array",
+                            description: "메뉴 품목 이름 목록. 가격/원산지/빈 줄 제외, 대표 메뉴를 맨 앞에",
+                            items: { type: "string" },
+                          },
                         },
-                        price: {
-                          type: "string",
-                          description: "코너 가격, 숫자와 콤마만 (예: '6,500'). 표기가 없으면 빈 문자열 ''",
-                        },
-                        items: {
-                          type: "array",
-                          description: "메뉴 품목 이름 목록. 가격/원산지/빈 줄 제외, 대표 메뉴를 맨 앞에",
-                          items: { type: "string" },
-                        },
+                        required: ["name", "price", "items"],
                       },
-                      required: ["name", "price", "items"],
                     },
                   },
+                  required: ["time", "operatingHours", "corners"],
                 },
-                required: ["time", "operatingHours", "corners"],
               },
             },
+            required: ["date", "meals"],
           },
-          required: ["date", "meals"],
         },
       },
+      required: ["days"],
     },
-    required: ["days"],
   },
 };
 
@@ -130,35 +133,35 @@ export async function extractWeeklyMenu(
   image: MenuImage,
   expectedDates: { date: string; weekday: string }[],
 ): Promise<Map<string, DguMeal[]>> {
-  if (!CONFIG.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured; cannot run D-Flex menu OCR");
+  if (!CONFIG.MINDLOGIC_KEY) {
+    throw new Error("MINDLOGIC_KEY is not configured; cannot run D-Flex menu OCR");
   }
 
-  // 키는 x-api-key 헤더로 전송됨 (게이트웨이/Anthropic 모두 동일).
-  const client = new Anthropic({ apiKey: CONFIG.ANTHROPIC_API_KEY, baseURL: GATEWAY_BASE_URL });
+  const client = new OpenAI({ apiKey: CONFIG.MINDLOGIC_KEY, baseURL: GATEWAY_BASE_URL });
 
-  const response = await client.messages.create({
+  const response = await client.chat.completions.create({
     model: OCR_MODEL,
-    max_tokens: 16000,
+    max_completion_tokens: 16000,
+    reasoning_effort: "low",
     tools: [MENU_TOOL],
-    tool_choice: { type: "tool", name: TOOL_NAME },
+    tool_choice: { type: "function", function: { name: TOOL_NAME } },
     messages: [
       {
         role: "user",
         content: [
-          { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
+          { type: "image_url", image_url: { url: `data:${image.mediaType};base64,${image.data}` } },
           { type: "text", text: buildPrompt(expectedDates) },
         ],
       },
     ],
   });
 
-  const toolUse = response.content.find((block) => block.type === "tool_use");
-  if (!toolUse || toolUse.type !== "tool_use") {
-    throw new Error("D-Flex menu OCR returned no tool_use block");
+  const toolCall = response.choices[0]?.message.tool_calls?.[0];
+  if (!toolCall || toolCall.type !== "function") {
+    throw new Error("D-Flex menu OCR returned no function tool call");
   }
 
-  const result = toolUse.input as OcrResult;
+  const result = JSON.parse(toolCall.function.arguments) as OcrResult;
   const mealsByDate = new Map<string, DguMeal[]>();
 
   for (const day of result.days) {

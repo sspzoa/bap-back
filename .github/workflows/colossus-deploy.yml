@@ -12,14 +12,14 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           REFRESH_API_KEY: ${{ secrets.REFRESH_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MINDLOGIC_KEY: ${{ secrets.MINDLOGIC_KEY }}
         run: |
           set -euo pipefail
           umask 077
           {
             echo "MONGODB_URI=${MONGODB_URI}"
             echo "REFRESH_API_KEY=${REFRESH_API_KEY}"
-            echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
+            echo "MINDLOGIC_KEY=${MINDLOGIC_KEY}"
             echo "NODE_ENV=production"
             echo "IMAGE_TAG=latest"
           } > /opt/bap-back/.env
