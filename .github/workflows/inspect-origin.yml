@@ -5,20 +5,26 @@ jobs:
   inspect:
     runs-on: [self-hosted]
     steps:
-      - name: What is on 443 vs 14741
+      - name: Traefik / dokploy route for api
         run: |
           set +e
-          echo "===== docker ps ====="
-          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}"
-          echo "===== listeners ====="
-          (ss -lntp || netstat -lntp) 2>/dev/null | head -80
-          echo "===== curl 14741 ====="
-          curl -sS -m 5 http://127.0.0.1:14741/ | head -c 300; echo
-          echo "===== curl 443 ====="
-          curl -skS -m 5 --resolve api.xn--rh3b.net:443:127.0.0.1 https://api.xn--rh3b.net/ | head -c 300; echo
-          echo "===== curl 80 ====="
-          curl -sS -m 5 -H "Host: api.xn--rh3b.net" http://127.0.0.1/ | head -c 200; echo
-          echo "===== nginx/caddy? ====="
-          command -v nginx; command -v caddy
-          ls /etc/nginx/sites-enabled 2>/dev/null
-          ls /etc/caddy 2>/dev/null
+          echo "===== old bap swarm labels ====="
+          docker inspect bapnet-bapback-smqpi6.1.5icogwjekgln8ugabnycr1tj4 --format "{{json .Config.Labels}}"
+          echo
+          echo "===== bap-back labels ====="
+          docker inspect bap-back --format "{{json .Config.Labels}}"
+          echo
+          echo "===== traefik routers via api ====="
+          docker exec dokploy-traefik wget -qO- http://127.0.0.1:8080/api/http/routers 2>/dev/null | head -c 200 || true
+          echo
+          docker exec dokploy-traefik wget -qO- http://127.0.0.1:8080/api/rawdata 2>/dev/null | head -c 100 || true
+          echo
+          echo "===== traefik files ====="
+          docker exec dokploy-traefik ls -la /etc/traefik /etc/dokploy /data 2>/dev/null
+          docker exec dokploy-traefik sh -c "find / -name \"*dynamic*\" -o -name \"*bap*\" 2>/dev/null" | head
+          echo "===== caddy ====="
+          sed -n "1,200p" /etc/caddy/Caddyfile 2>/dev/null
+          echo "===== dokploy compose labels on old ====="
+          docker service inspect bapnet-bapback-smqpi6 --pretty 2>/dev/null | head -80
+          echo "===== hostnames in traefik ====="
+          docker exec dokploy-traefik sh -c "grep -R \"xn--rh3b\\|밥.net\\|bap\" /etc/traefik /data /traefik 2>/dev/null" | head -40
