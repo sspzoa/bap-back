@@ -50,34 +50,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
-      - name: Deploy to 443
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          REFRESH_API_KEY: ${{ secrets.REFRESH_API_KEY }}
-          MINDLOGIC_KEY: ${{ secrets.MINDLOGIC_KEY }}
+      - name: Docker Run
         run: |
-          set -euo pipefail
-          docker pull "${{ env.DOCKER_IMAGE }}:latest"
-          docker service update --detach=false --with-registry-auth \
-            --image "${{ env.DOCKER_IMAGE }}:latest" \
-            --env-add "MONGODB_URI=${MONGODB_URI}" \
-            --env-add "REFRESH_API_KEY=${REFRESH_API_KEY}" \
-            --env-add "MINDLOGIC_KEY=${MINDLOGIC_KEY}" \
-            --env-add "NODE_ENV=production" \
-            bapnet-bapback-smqpi6
           docker stop bap-back || true
           docker rm bap-back || true
-          ok=0
-          for i in $(seq 1 30); do
-            if curl -skfsS --max-time 3 --resolve api.xn--rh3b.net:443:127.0.0.1 https://api.xn--rh3b.net/health >/dev/null; then
-              ok=1
-              break
-            fi
-            sleep 2
-          done
-          if [ "$ok" -ne 1 ]; then
-            echo "443 health failed"
-            docker service ps bapnet-bapback-smqpi6
-            exit 1
-          fi
-          echo "live on 443"
+          docker rmi ${{ env.DOCKER_IMAGE }}:latest || true
+          docker run -d -p 14741:3000 --name bap-back --restart always \
+            -e MONGODB_URI=${{ secrets.MONGODB_URI }} \
+            -e REFRESH_API_KEY=${{ secrets.REFRESH_API_KEY }} \
+            -e MINDLOGIC_KEY=${{ secrets.MINDLOGIC_KEY }} \
+            ${{ env.DOCKER_IMAGE }}:latest
