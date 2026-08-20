@@ -1,34 +1,53 @@
 name: inspect-origin
 on:
   workflow_dispatch:
-    inputs:
-      mode:
-        description: dump or fix
-        default: dump
 jobs:
-  run:
+  fix:
     runs-on: [self-hosted]
     steps:
-      - name: dump or fix traefik
+      - name: Point api.xn--rh3b.net at host :14741
         run: |
-          set -e
-          echo "===== current dynamic yml ====="
-          docker exec dokploy-traefik cat /etc/dokploy/traefik/dynamic/bapnet-bapback-smqpi6.yml || true
-          echo
-          echo "===== dynamic dir ====="
-          docker exec dokploy-traefik ls -la /etc/dokploy/traefik/dynamic
-          echo
-          echo "===== host gateway from traefik ====="
-          docker exec dokploy-traefik sh -c "getent hosts host.docker.internal; ip route | head -5"
-          if [ "${{ github.event.inputs.mode }}" = "fix" ]; then
-            echo "===== applying 14741 router ====="
-            # write via a temp on the runner host, then docker cp if the path is bind-mounted
-            if [ -f /etc/dokploy/traefik/dynamic/bapnet-bapback-smqpi6.yml ]; then
-              TARGET=/etc/dokploy/traefik/dynamic
-            else
-              TARGET=""
-              docker exec dokploy-traefik sh -c "ls /etc/dokploy/traefik/dynamic/bapnet-bapback-smqpi6.yml"
-            fi
-            echo "host target=$TARGET"
-            ls -la /etc/dokploy/traefik/dynamic 2>/dev/null || true
+          set -euo pipefail
+          YML="http:
+  routers:
+    api-14741-web:
+      rule: Host(\`api.xn--rh3b.net\`)
+      service: api-14741
+      middlewares:
+        - redirect-to-https
+      entryPoints:
+        - web
+      priority: 1000
+    api-14741-websecure:
+      rule: Host(\`api.xn--rh3b.net\`)
+      service: api-14741
+      entryPoints:
+        - websecure
+      priority: 1000
+      tls:
+        certResolver: letsencrypt
+  services:
+    api-14741:
+      loadBalancer:
+        servers:
+          - url: http://172.17.0.1:14741
+        passHostHeader: true
+"
+          if [ -d /etc/dokploy/traefik/dynamic ]; then
+            printf "%s\n" "$YML" | sudo tee /etc/dokploy/traefik/dynamic/api-14741.yml >/dev/null
+            sudo chmod 644 /etc/dokploy/traefik/dynamic/api-14741.yml
+            echo "wrote host /etc/dokploy/traefik/dynamic/api-14741.yml"
+          else
+            printf "%s\n" "$YML" | docker exec -i dokploy-traefik sh -c "cat > /etc/dokploy/traefik/dynamic/api-14741.yml"
+            echo "wrote via docker exec"
           fi
+          docker exec dokploy-traefik cat /etc/dokploy/traefik/dynamic/api-14741.yml
+          echo "===== wait reload ====="
+          sleep 3
+          echo "===== via docker0 ====="
+          curl -sS -m 5 http://172.17.0.1:14741/ | head -c 220; echo
+          echo "===== via traefik localhost 443 ====="
+          curl -skS -m 8 --resolve api.xn--rh3b.net:443:127.0.0.1 https://api.xn--rh3b.net/ | head -c 280; echo
+          echo
+          curl -skS -m 8 -o /tmp/k -w "local_kdmhs=%{http_code}\n" --resolve api.xn--rh3b.net:443:127.0.0.1 https://api.xn--rh3b.net/kdmhs/2026-08-19
+          head -c 120 /tmp/k; echo
