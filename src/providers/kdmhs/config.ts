@@ -3,7 +3,8 @@ import type { ProviderConfig } from "@/providers/types";
 export const KDMHS_CONFIG: ProviderConfig = {
   id: "kdmhs",
   name: "한국디지털미디어고등학교",
-  basePath: "",
+  basePath: "/kdmhs",
+  aliases: [""],
   origins: ["https://xn--rh3b.net", "https://밥.net"],
   dbName: "bap",
   collection: "meal_data",
@@ -63,7 +64,6 @@ export const KDMHS_CONFIG: ProviderConfig = {
 export const KDMHS_WEBSITE = {
   BASE_URL: "https://dimigo-h.goeas.kr",
   TABLE_PATH: "dimigo-h/ad/fm/foodmenu/selectFoodMenuView.do",
-  PAGE_RANGE: { START: 1, END: 1 },
 } as const;
 
 export const MEAL_TYPES = {

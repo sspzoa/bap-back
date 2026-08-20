@@ -1,5 +1,4 @@
 import { CONFIG } from "@/core/config";
-import { getCorsHeaders } from "@/core/cors";
 import { ApiError } from "@/core/errors";
 import { MongoDBService } from "@/core/mongodb";
 import { KDMHS_CONFIG } from "@/providers/kdmhs/config";
@@ -22,7 +21,7 @@ export function createKdmhsProvider(): MealProvider {
 
     async init() {
       await db.connect();
-      await db.createIndexes([{ key: { documentId: 1 } }, { key: { createdAt: 1 } }, { key: { updatedAt: 1 } }]);
+      await db.createIndexes([{ key: { updatedAt: 1 } }]);
     },
 
     async shutdown() {
@@ -45,7 +44,7 @@ export function createKdmhsProvider(): MealProvider {
       return runKdmhsRefresh(db, type);
     },
 
-    async handleExtraRoute(subPath, method, requestId, origin) {
+    async handleExtraRoute(subPath, method) {
       const searchMatch = subPath.match(/^\/search\/(.+)$/);
       if (searchMatch && method === "GET") {
         const foodName = decodeURIComponent(searchMatch[1]);
@@ -55,24 +54,14 @@ export function createKdmhsProvider(): MealProvider {
           throw new ApiError(404, "해당 메뉴를 찾을 수 없어요");
         }
 
-        return new Response(
-          JSON.stringify({
-            requestId,
-            timestamp: new Date().toISOString(),
-            foodName,
-            matchedMenu: result.menuName,
-            image: result.image,
-            date: result.date,
-            mealType: result.mealType,
-            section: result.section,
-          }),
-          {
-            headers: {
-              ...getCorsHeaders(origin),
-              "Content-Type": "application/json",
-            },
-          },
-        );
+        return {
+          foodName,
+          matchedMenu: result.menuName,
+          image: result.image,
+          date: result.date,
+          mealType: result.mealType,
+          section: result.section,
+        };
       }
 
       return null;

@@ -1,8 +1,14 @@
-import { createDguProvider } from "@/providers/dgu";
-import { createKdmhsProvider } from "@/providers/kdmhs";
 import type { MealProvider } from "@/providers/types";
 
-class ProviderRegistry {
+function providerPaths(provider: MealProvider): string[] {
+  return [provider.config.basePath, ...(provider.config.aliases ?? [])];
+}
+
+function matchesPrefix(path: string, prefix: string): boolean {
+  return prefix !== "" && (path === prefix || path.startsWith(`${prefix}/`));
+}
+
+export class ProviderRegistry {
   private providers: MealProvider[] = [];
 
   register(provider: MealProvider): void {
@@ -14,17 +20,24 @@ class ProviderRegistry {
   }
 
   findByPath(path: string): MealProvider | undefined {
-    return (
-      this.providers
-        .filter((p) => p.config.basePath !== "" && path.startsWith(p.config.basePath))
-        .sort((a, b) => b.config.basePath.length - a.config.basePath.length)[0] ??
-      this.providers.find((p) => p.config.basePath === "")
-    );
+    const prefixMatch = this.providers
+      .flatMap((provider) => providerPaths(provider).map((prefix) => ({ provider, prefix })))
+      .filter(({ prefix }) => matchesPrefix(path, prefix))
+      .sort((a, b) => b.prefix.length - a.prefix.length)[0];
+
+    return prefixMatch?.provider ?? this.providers.find((provider) => providerPaths(provider).includes(""));
   }
 
   getSubPath(provider: MealProvider, fullPath: string): string {
-    if (provider.config.basePath === "") return fullPath;
-    return fullPath.slice(provider.config.basePath.length) || "/";
+    const matchedPrefix = providerPaths(provider)
+      .filter((prefix) => matchesPrefix(fullPath, prefix))
+      .sort((a, b) => b.length - a.length)[0];
+
+    if (!matchedPrefix) {
+      return fullPath;
+    }
+
+    return fullPath.slice(matchedPrefix.length) || "/";
   }
 
   getAllOrigins(): string[] {
@@ -39,16 +52,4 @@ export function getRegistry(): ProviderRegistry {
     registry = new ProviderRegistry();
   }
   return registry;
-}
-
-export function initializeRegistry(): ProviderRegistry {
-  const reg = getRegistry();
-
-  // Guard against repeated initialization in the same process.
-  if (reg.getProviders().length === 0) {
-    reg.register(createKdmhsProvider());
-    reg.register(createDguProvider());
-  }
-
-  return reg;
 }

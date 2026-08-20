@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import { DFLEX_WEBSITE } from "@/providers/dgu/config";
-import { formatDate, getWeekDates } from "@/utils/date";
+import { formatDate, getWeekDates, parseLocalDate } from "@/utils/date";
 import { fetchWithRetry } from "@/utils/fetch";
 
 const USER_AGENT =
@@ -24,11 +24,6 @@ function parseWeekRange(title: string): { weekStart: string; weekEnd: string } |
     weekStart: `${match[1]}-${match[2]}-${match[3]}`,
     weekEnd: `${match[4]}-${match[5]}-${match[6]}`,
   };
-}
-
-function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(year, month - 1, day);
 }
 
 async function fetchHtml(url: string): Promise<string> {

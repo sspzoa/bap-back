@@ -12,16 +12,16 @@ export class ApiError extends Error {
   }
 }
 
-export class MealNotFoundError extends Error {
+export class MealNotFoundError extends ApiError {
   constructor(message = "정보가 없어요") {
-    super(message);
+    super(404, message);
     this.name = "MealNotFoundError";
   }
 }
 
-export class MealNoOperationError extends Error {
+export class MealNoOperationError extends ApiError {
   constructor(message = "급식 운영이 없어요") {
-    super(message);
+    super(404, message);
     this.name = "MealNoOperationError";
   }
 }

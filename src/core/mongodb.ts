@@ -67,31 +67,30 @@ export class MongoDBService {
     }
   }
 
-  async saveMealData<TData>(date: string, data: TData, extra?: Record<string, unknown>): Promise<void> {
+  async saveMealData<TData>(date: string, data: TData): Promise<void> {
     const collection = this.getCollection();
     const now = new Date();
 
-    const existingDoc = await collection.findOne({ _id: date });
+    const result = await collection.updateOne(
+      { _id: date },
+      {
+        $set: { data, updatedAt: now },
+        $setOnInsert: { createdAt: now },
+      },
+      { upsert: true },
+    );
 
-    if (existingDoc) {
-      await collection.updateOne({ _id: date }, { $set: { data, ...extra, updatedAt: now } });
-      logger.info(`Updated meal data [${this.dbName}]: ${date}`);
-    } else {
-      await collection.insertOne({
-        _id: date,
-        data,
-        ...extra,
-        createdAt: now,
-        updatedAt: now,
-      } as never);
+    if (result.upsertedCount > 0) {
       logger.info(`Saved meal data [${this.dbName}]: ${date}`);
+    } else {
+      logger.info(`Updated meal data [${this.dbName}]: ${date}`);
     }
   }
 
   async getMealData<TData>(date: string): Promise<TData | null> {
     const collection = this.getCollection();
     const document = await collection.findOne({ _id: date });
-    return (document?.data as TData) || null;
+    return (document?.data as TData) ?? null;
   }
 
   async getStats(): Promise<{ totalMealData: number; lastUpdated: Date | null }> {

@@ -1,16 +1,22 @@
 import { serve } from "bun";
 import { CONFIG } from "@/core/config";
 import { getCorsHeaders, handleCors } from "@/core/cors";
-import { ApiError, handleError, MealNoOperationError, MealNotFoundError } from "@/core/errors";
+import { ApiError, handleError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import type { SchedulerHandle } from "@/core/scheduler";
 import { setupScheduler } from "@/core/scheduler";
 import type { HealthCheckResponse, MealResponse } from "@/core/types";
-import { initializeRegistry } from "@/providers/registry";
+import { initializeRegistry } from "@/providers/init";
 import { isValidDate } from "@/utils/date";
 
-function generateRequestId(): string {
-  return Math.random().toString(36).substring(2, 10);
+function jsonResponse(body: unknown, origin: string | null, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...getCorsHeaders(origin),
+      "Content-Type": "application/json",
+    },
+  });
 }
 
 export async function createServer() {
@@ -35,7 +41,7 @@ export async function createServer() {
         const method = req.method;
 
         const requestLogger = logger.request(method, path);
-        const requestId = requestLogger.context?.requestId || generateRequestId();
+        const requestId = requestLogger.context?.requestId ?? "unknown";
         const startTime = Date.now();
 
         try {
@@ -48,18 +54,13 @@ export async function createServer() {
           const origin = req.headers.get("Origin");
 
           if (path === "/") {
-            const response = new Response(
-              JSON.stringify({
+            const response = jsonResponse(
+              {
                 requestId,
                 timestamp: new Date().toISOString(),
                 message: "api.밥.net",
-              }),
-              {
-                headers: {
-                  ...getCorsHeaders(origin),
-                  "Content-Type": "application/json",
-                },
               },
+              origin,
             );
             requestLogger.response(response.status, Date.now() - startTime);
             return response;
@@ -85,9 +86,7 @@ export async function createServer() {
                 lastUpdated: stats.lastUpdated,
               },
             };
-            response = new Response(JSON.stringify(body), {
-              headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
-            });
+            response = jsonResponse(body, origin);
           } else {
             const refreshMatch = subPath.match(/^\/refresh\/(\d{4}-\d{2}-\d{2})$/);
             const dateMatch = subPath.match(/^\/(\d{4}-\d{2}-\d{2})$/);
@@ -105,34 +104,27 @@ export async function createServer() {
 
               const data = await provider.refreshMealData(date);
               const body: MealResponse = { requestId, timestamp: new Date().toISOString(), date, data };
-              response = new Response(JSON.stringify(body), {
-                headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
-              });
+              response = jsonResponse(body, origin);
             } else if (dateMatch) {
               const date = dateMatch[1];
               if (!isValidDate(date)) {
                 throw new ApiError(400, "Invalid date format");
               }
 
-              try {
-                const data = await provider.getMealData(date);
-                const body: MealResponse = { requestId, timestamp: new Date().toISOString(), date, data };
-                response = new Response(JSON.stringify(body), {
-                  headers: { ...getCorsHeaders(origin), "Content-Type": "application/json" },
-                });
-              } catch (error) {
-                if (error instanceof MealNoOperationError) {
-                  throw new ApiError(404, error.message);
-                }
-                if (error instanceof MealNotFoundError) {
-                  throw new ApiError(404, error.message);
-                }
-                throw error;
-              }
+              const data = await provider.getMealData(date);
+              const body: MealResponse = { requestId, timestamp: new Date().toISOString(), date, data };
+              response = jsonResponse(body, origin);
             } else if (provider.handleExtraRoute) {
-              const extraResponse = await provider.handleExtraRoute(subPath, method, requestId, origin);
-              if (extraResponse) {
-                response = extraResponse;
+              const extraPayload = await provider.handleExtraRoute(subPath, method);
+              if (extraPayload && typeof extraPayload === "object") {
+                response = jsonResponse(
+                  {
+                    requestId,
+                    timestamp: new Date().toISOString(),
+                    ...extraPayload,
+                  },
+                  origin,
+                );
               } else {
                 throw new ApiError(404, "Endpoint not found");
               }

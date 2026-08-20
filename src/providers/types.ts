@@ -10,8 +10,10 @@ export interface ScheduleEntry {
 export interface ProviderConfig {
   id: string;
   name: string;
-  /** "" for root-level routes, "/dgu" for /dgu/* prefix */
+  /** Primary route prefix, e.g. "/kdmhs" or "/dgu" */
   basePath: string;
+  /** Extra prefixes that map to the same provider. "" keeps root routes. */
+  aliases?: string[];
   origins: string[];
   dbName: string;
   collection: string;
@@ -32,12 +34,7 @@ export interface MealProvider {
 
   /**
    * Handle routes beyond the standard health/date/refresh.
-   * Return Response if handled, null to fall through to 404.
+   * Return a JSON payload if handled, null to fall through to 404.
    */
-  handleExtraRoute?(
-    subPath: string,
-    method: string,
-    requestId: string,
-    origin: string | null,
-  ): Promise<Response | null>;
+  handleExtraRoute?(subPath: string, method: string): Promise<unknown | null>;
 }

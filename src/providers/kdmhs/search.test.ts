@@ -10,7 +10,6 @@ function document(_id: string, data: CafeteriaData): MealDataDocument {
   return {
     _id,
     data,
-    documentId: _id,
     createdAt: new Date(_id),
     updatedAt: new Date(_id),
   };

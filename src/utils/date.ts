@@ -5,24 +5,24 @@ export function formatDate(date: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+export function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export function isValidDate(dateString: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
     return false;
   }
 
-  const date = new Date(dateString);
-  return !Number.isNaN(date.getTime());
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
-export function dateToSday(dateStr: string): number {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const kstOffset = 9 * 60 * 60 * 1000;
-  const utcMs = Date.UTC(year, month - 1, day) - kstOffset;
-  return Math.floor(utcMs / 1000);
-}
-
+/** Monday–Saturday of the ISO-style week that contains `date`. Sunday belongs to the previous week. */
 export function getWeekDates(date: string): string[] {
-  const target = new Date(date);
+  const target = parseLocalDate(date);
   const dayOfWeek = target.getDay();
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const monday = new Date(target);
@@ -35,30 +35,4 @@ export function getWeekDates(date: string): string[] {
     dates.push(formatDate(d));
   }
   return dates;
-}
-
-export function parseKoreanDate(text: string, registrationDate?: string): Date | null {
-  const normalizedText = text.replace(/[\uFF01-\uFF5E]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0));
-
-  const match = normalizedText.match(/(\d+)월\s*(\d+)일/);
-  if (!match) return null;
-
-  const [, month, day] = match;
-
-  let year: number;
-  if (registrationDate) {
-    const registrationYear = new Date(registrationDate).getFullYear();
-    const registrationMonth = new Date(registrationDate).getMonth() + 1;
-    const menuMonth = Number.parseInt(month, 10);
-
-    if (registrationMonth === 12 && menuMonth === 1) {
-      year = registrationYear + 1;
-    } else {
-      year = registrationYear;
-    }
-  } else {
-    year = new Date().getFullYear();
-  }
-
-  return new Date(year, Number.parseInt(month, 10) - 1, Number.parseInt(day, 10));
 }

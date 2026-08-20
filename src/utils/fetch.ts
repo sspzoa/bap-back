@@ -41,6 +41,9 @@ async function fetchWithNative(
     return response;
   } catch (error) {
     fetchLogger.error(`Fetch failed: ${url}`, error);
+    if (error instanceof HttpError) {
+      throw error;
+    }
     if (error instanceof Error && error.name === "AbortError") {
       throw new HttpError(408, "Request timeout", url);
     }
