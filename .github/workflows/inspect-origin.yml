@@ -1,0 +1,23 @@
+name: inspect-origin
+on:
+  workflow_dispatch:
+jobs:
+  one:
+    runs-on: [self-hosted]
+    steps:
+      - name: Point 443 at CI 14741 and remove dokploy app
+        run: |
+          set -euo pipefail
+          echo aHR0cDoKICByb3V0ZXJzOgogICAgYmFwbmV0LWJhcGJhY2stc21xcGk2LXJvdXRlci0yOgogICAgICBydWxlOiBIb3N0KGBhcGkueG4tLXJoM2IubmV0YCkKICAgICAgc2VydmljZTogYmFwbmV0LWJhcGJhY2stc21xcGk2LXNlcnZpY2UtMgogICAgICBlbnRyeVBvaW50czoKICAgICAgICAtIHdlYgogICAgYmFwbmV0LWJhcGJhY2stc21xcGk2LXJvdXRlci13ZWJzZWN1cmUtMjoKICAgICAgcnVsZTogSG9zdChgYXBpLnhuLS1yaDNiLm5ldGApCiAgICAgIHNlcnZpY2U6IGJhcG5ldC1iYXBiYWNrLXNtcXBpNi1zZXJ2aWNlLTIKICAgICAgZW50cnlQb2ludHM6CiAgICAgICAgLSB3ZWJzZWN1cmUKICAgICAgdGxzOgogICAgICAgIGNlcnRSZXNvbHZlcjogbGV0c2VuY3J5cHQKICBzZXJ2aWNlczoKICAgIGJhcG5ldC1iYXBiYWNrLXNtcXBpNi1zZXJ2aWNlLTI6CiAgICAgIGxvYWRCYWxhbmNlcjoKICAgICAgICBzZXJ2ZXJzOgogICAgICAgICAgLSB1cmw6IGh0dHA6Ly8xNzIuMTcuMC4xOjE0NzQxCiAgICAgICAgcGFzc0hvc3RIZWFkZXI6IHRydWU= | base64 -d | sudo tee /etc/dokploy/traefik/dynamic/bapnet-bapback-smqpi6.yml >/dev/null
+          sudo chmod 644 /etc/dokploy/traefik/dynamic/bapnet-bapback-smqpi6.yml
+          docker service rm bapnet-bapback-smqpi6 || true
+          echo "===== 14741 ====="
+          curl -sS -m 5 -o /tmp/c -w '14741=%{http_code}\n' http://127.0.0.1:14741/
+          head -c 200 /tmp/c; echo
+          sleep 3
+          echo "===== 443 ====="
+          curl -skS -m 8 -o /tmp/r -w '443=%{http_code}\n' --resolve api.xn--rh3b.net:443:127.0.0.1 https://api.xn--rh3b.net/
+          head -c 220 /tmp/r; echo
+          echo "===== services bap ====="
+          docker service ls --format '{{.Name}}' | grep -i bap || echo none
+          docker ps --format '{{.Names}} {{.Ports}}' | grep -i bap || true
