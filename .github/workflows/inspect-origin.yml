@@ -1,0 +1,24 @@
+name: inspect-origin
+on:
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: [self-hosted]
+    steps:
+      - name: What is on 443 vs 14741
+        run: |
+          set +e
+          echo "===== docker ps ====="
+          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}"
+          echo "===== listeners ====="
+          (ss -lntp || netstat -lntp) 2>/dev/null | head -80
+          echo "===== curl 14741 ====="
+          curl -sS -m 5 http://127.0.0.1:14741/ | head -c 300; echo
+          echo "===== curl 443 ====="
+          curl -skS -m 5 --resolve api.xn--rh3b.net:443:127.0.0.1 https://api.xn--rh3b.net/ | head -c 300; echo
+          echo "===== curl 80 ====="
+          curl -sS -m 5 -H "Host: api.xn--rh3b.net" http://127.0.0.1/ | head -c 200; echo
+          echo "===== nginx/caddy? ====="
+          command -v nginx; command -v caddy
+          ls /etc/nginx/sites-enabled 2>/dev/null
+          ls /etc/caddy 2>/dev/null
