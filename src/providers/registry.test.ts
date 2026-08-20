@@ -3,12 +3,11 @@ import type { MongoDBService } from "@/core/mongodb";
 import { ProviderRegistry } from "@/providers/registry";
 import type { MealProvider, ProviderConfig } from "@/providers/types";
 
-function fakeProvider(id: string, basePath: string, aliases?: string[]): MealProvider {
+function fakeProvider(id: string, basePath: string): MealProvider {
   const config: ProviderConfig = {
     id,
     name: id,
     basePath,
-    aliases,
     origins: [],
     dbName: id,
     collection: "meal_data",
@@ -30,25 +29,25 @@ function fakeProvider(id: string, basePath: string, aliases?: string[]): MealPro
 describe("ProviderRegistry path matching", () => {
   function registry() {
     const reg = new ProviderRegistry();
-    reg.register(fakeProvider("kdmhs", "/kdmhs", [""]));
+    reg.register(fakeProvider("kdmhs", "/kdmhs"));
     reg.register(fakeProvider("dgu", "/dgu"));
     return reg;
   }
 
-  test("matches /kdmhs prefix and empty alias to KDMHS", () => {
+  test("matches each provider only by its own basePath", () => {
     const reg = registry();
     expect(reg.findByPath("/kdmhs/2026-08-20")?.config.id).toBe("kdmhs");
     expect(reg.findByPath("/kdmhs/health")?.config.id).toBe("kdmhs");
     expect(reg.findByPath("/kdmhs/search/김치전")?.config.id).toBe("kdmhs");
-    expect(reg.findByPath("/2026-08-20")?.config.id).toBe("kdmhs");
-    expect(reg.findByPath("/health")?.config.id).toBe("kdmhs");
-    expect(reg.findByPath("/search/김치전")?.config.id).toBe("kdmhs");
-  });
-
-  test("matches /dgu prefix to DGU and does not steal kdmhs paths", () => {
-    const reg = registry();
     expect(reg.findByPath("/dgu/2026-08-20")?.config.id).toBe("dgu");
     expect(reg.findByPath("/dgu/health")?.config.id).toBe("dgu");
+  });
+
+  test("does not treat root paths as a default provider", () => {
+    const reg = registry();
+    expect(reg.findByPath("/2026-08-20")).toBeUndefined();
+    expect(reg.findByPath("/health")).toBeUndefined();
+    expect(reg.findByPath("/search/김치전")).toBeUndefined();
   });
 
   test("strips the matching prefix from subPath", () => {
@@ -61,7 +60,6 @@ describe("ProviderRegistry path matching", () => {
 
     expect(reg.getSubPath(kdmhs, "/kdmhs/2026-08-20")).toBe("/2026-08-20");
     expect(reg.getSubPath(kdmhs, "/kdmhs/search/김치전")).toBe("/search/김치전");
-    expect(reg.getSubPath(kdmhs, "/2026-08-20")).toBe("/2026-08-20");
     expect(reg.getSubPath(kdmhs, "/kdmhs")).toBe("/");
     expect(reg.getSubPath(dgu, "/dgu/health")).toBe("/health");
   });

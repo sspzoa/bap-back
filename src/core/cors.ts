@@ -10,9 +10,9 @@ function getAllowedOrigins(): string[] {
 
 export function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowedOrigins = getAllowedOrigins();
-  const isAllowed = origin && allowedOrigins.includes(origin);
+  const isAllowed = !!origin && allowedOrigins.includes(origin);
   return {
-    "Access-Control-Allow-Origin": isAllowed ? origin : allowedOrigins[0] || "*",
+    ...(isAllowed && origin ? { "Access-Control-Allow-Origin": origin } : {}),
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };

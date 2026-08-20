@@ -10,10 +10,8 @@ export interface ScheduleEntry {
 export interface ProviderConfig {
   id: string;
   name: string;
-  /** Primary route prefix, e.g. "/kdmhs" or "/dgu" */
+  /** Route prefix, e.g. "/kdmhs" or "/dgu" */
   basePath: string;
-  /** Extra prefixes that map to the same provider. "" keeps root routes. */
-  aliases?: string[];
   origins: string[];
   dbName: string;
   collection: string;

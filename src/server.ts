@@ -59,6 +59,11 @@ export async function createServer() {
                 requestId,
                 timestamp: new Date().toISOString(),
                 message: "api.밥.net",
+                providers: providers.map((provider) => ({
+                  id: provider.config.id,
+                  name: provider.config.name,
+                  basePath: provider.config.basePath,
+                })),
               },
               origin,
             );

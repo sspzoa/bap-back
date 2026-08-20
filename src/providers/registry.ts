@@ -1,11 +1,7 @@
 import type { MealProvider } from "@/providers/types";
 
-function providerPaths(provider: MealProvider): string[] {
-  return [provider.config.basePath, ...(provider.config.aliases ?? [])];
-}
-
 function matchesPrefix(path: string, prefix: string): boolean {
-  return prefix !== "" && (path === prefix || path.startsWith(`${prefix}/`));
+  return path === prefix || path.startsWith(`${prefix}/`);
 }
 
 export class ProviderRegistry {
@@ -20,24 +16,18 @@ export class ProviderRegistry {
   }
 
   findByPath(path: string): MealProvider | undefined {
-    const prefixMatch = this.providers
-      .flatMap((provider) => providerPaths(provider).map((prefix) => ({ provider, prefix })))
-      .filter(({ prefix }) => matchesPrefix(path, prefix))
-      .sort((a, b) => b.prefix.length - a.prefix.length)[0];
-
-    return prefixMatch?.provider ?? this.providers.find((provider) => providerPaths(provider).includes(""));
+    return this.providers
+      .filter((provider) => matchesPrefix(path, provider.config.basePath))
+      .sort((a, b) => b.config.basePath.length - a.config.basePath.length)[0];
   }
 
   getSubPath(provider: MealProvider, fullPath: string): string {
-    const matchedPrefix = providerPaths(provider)
-      .filter((prefix) => matchesPrefix(fullPath, prefix))
-      .sort((a, b) => b.length - a.length)[0];
-
-    if (!matchedPrefix) {
+    const prefix = provider.config.basePath;
+    if (!matchesPrefix(fullPath, prefix)) {
       return fullPath;
     }
 
-    return fullPath.slice(matchedPrefix.length) || "/";
+    return fullPath.slice(prefix.length) || "/";
   }
 
   getAllOrigins(): string[] {
