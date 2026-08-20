@@ -1,0 +1,21 @@
+name: inspect-origin
+on:
+  workflow_dispatch:
+jobs:
+  restore:
+    runs-on: [self-hosted]
+    steps:
+      - name: Recreate pre-colossus 443 bap
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          REFRESH_API_KEY: ${{ secrets.REFRESH_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          echo "===== images ====="
+          docker images --format '{{.Repository}}:{{.Tag}}' | grep -E 'bap|sspzoa/bap' || true
+          echo "===== traefik nets ====="
+          docker inspect dokploy-traefik --format '{{json .NetworkSettings.Networks}}'
+          echo
+          echo "===== leftover service ====="
+          docker service ls --format '{{.Name}}' | grep -i bap || echo none
