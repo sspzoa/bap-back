@@ -51,7 +51,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_TOKEN }}
-      - name: Deploy behind Traefik :443
+      - name: Deploy to 443
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           REFRESH_API_KEY: ${{ secrets.REFRESH_API_KEY }}
