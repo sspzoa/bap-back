@@ -1,5 +1,4 @@
-wrote 2575
- Docker
+name: CI/CD Docker
 
 on:
   push:
