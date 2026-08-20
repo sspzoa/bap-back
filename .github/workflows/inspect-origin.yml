@@ -1,30 +1,34 @@
 name: inspect-origin
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: dump or fix
+        default: dump
 jobs:
-  inspect:
+  run:
     runs-on: [self-hosted]
     steps:
-      - name: Traefik / dokploy route for api
+      - name: dump or fix traefik
         run: |
-          set +e
-          echo "===== old bap swarm labels ====="
-          docker inspect bapnet-bapback-smqpi6.1.5icogwjekgln8ugabnycr1tj4 --format "{{json .Config.Labels}}"
+          set -e
+          echo "===== current dynamic yml ====="
+          docker exec dokploy-traefik cat /etc/dokploy/traefik/dynamic/bapnet-bapback-smqpi6.yml || true
           echo
-          echo "===== bap-back labels ====="
-          docker inspect bap-back --format "{{json .Config.Labels}}"
+          echo "===== dynamic dir ====="
+          docker exec dokploy-traefik ls -la /etc/dokploy/traefik/dynamic
           echo
-          echo "===== traefik routers via api ====="
-          docker exec dokploy-traefik wget -qO- http://127.0.0.1:8080/api/http/routers 2>/dev/null | head -c 200 || true
-          echo
-          docker exec dokploy-traefik wget -qO- http://127.0.0.1:8080/api/rawdata 2>/dev/null | head -c 100 || true
-          echo
-          echo "===== traefik files ====="
-          docker exec dokploy-traefik ls -la /etc/traefik /etc/dokploy /data 2>/dev/null
-          docker exec dokploy-traefik sh -c "find / -name \"*dynamic*\" -o -name \"*bap*\" 2>/dev/null" | head
-          echo "===== caddy ====="
-          sed -n "1,200p" /etc/caddy/Caddyfile 2>/dev/null
-          echo "===== dokploy compose labels on old ====="
-          docker service inspect bapnet-bapback-smqpi6 --pretty 2>/dev/null | head -80
-          echo "===== hostnames in traefik ====="
-          docker exec dokploy-traefik sh -c "grep -R \"xn--rh3b\\|밥.net\\|bap\" /etc/traefik /data /traefik 2>/dev/null" | head -40
+          echo "===== host gateway from traefik ====="
+          docker exec dokploy-traefik sh -c "getent hosts host.docker.internal; ip route | head -5"
+          if [ "${{ github.event.inputs.mode }}" = "fix" ]; then
+            echo "===== applying 14741 router ====="
+            # write via a temp on the runner host, then docker cp if the path is bind-mounted
+            if [ -f /etc/dokploy/traefik/dynamic/bapnet-bapback-smqpi6.yml ]; then
+              TARGET=/etc/dokploy/traefik/dynamic
+            else
+              TARGET=""
+              docker exec dokploy-traefik sh -c "ls /etc/dokploy/traefik/dynamic/bapnet-bapback-smqpi6.yml"
+            fi
+            echo "host target=$TARGET"
+            ls -la /etc/dokploy/traefik/dynamic 2>/dev/null || true
+          fi
