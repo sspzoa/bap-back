@@ -16,6 +16,7 @@
   },
   "scripts": {
     "start": "bun src/index.ts",
+    "test": "bun test",
     "lint": "biome check --write --unsafe",
     "format": "biome check --write --unsafe"
   }

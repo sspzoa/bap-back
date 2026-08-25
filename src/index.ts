@@ -1,5 +1,5 @@
 import { createServer } from "@/server";
 
-const server = createServer();
+const server = await createServer();
 
 export { server };

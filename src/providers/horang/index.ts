@@ -1,8 +1,9 @@
 import { CONFIG } from "@/core/config";
 import { MongoDBService } from "@/core/mongodb";
+import { cornerMenuToPublic } from "@/core/publicMenu";
+import type { PublicDayMenu } from "@/core/types";
 import { HORANG_CONFIG } from "@/providers/horang/config";
-import { getHorangMenu, refreshHorangMenu, runHorangRefresh } from "@/providers/horang/service";
-import type { HorangMenu } from "@/providers/horang/types";
+import { getHorangMenu, runHorangRefresh } from "@/providers/horang/service";
 import type { MealProvider } from "@/providers/types";
 
 export function createHorangProvider(): MealProvider {
@@ -22,12 +23,8 @@ export function createHorangProvider(): MealProvider {
       await db.disconnect();
     },
 
-    async getMealData(date: string): Promise<HorangMenu> {
-      return getHorangMenu(db, date);
-    },
-
-    async refreshMealData(date: string): Promise<HorangMenu> {
-      return refreshHorangMenu(db, date);
+    async getMealData(date: string): Promise<PublicDayMenu> {
+      return cornerMenuToPublic(config.presentation.meals, (await getHorangMenu(db, date)).meals);
     },
 
     async getStats() {

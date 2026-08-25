@@ -62,20 +62,6 @@ export async function getDguMenu(db: MongoDBService, dateParam: string): Promise
   return getCachedMealDataOrThrow<DguMenu>(db, dateParam);
 }
 
-export async function refreshDguMenu(db: MongoDBService, dateParam: string): Promise<DguMenu> {
-  const articles = await fetchArticleList();
-  const article = findArticleForDate(articles, dateParam);
-
-  if (!article) {
-    const data = emptyMenu();
-    await db.saveMealData(dateParam, data);
-    return data;
-  }
-
-  const weekData = await refreshWeekFromArticle(db, article);
-  return weekData.get(dateParam) ?? emptyMenu();
-}
-
 export async function runDguRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {
   const refreshLogger = logger.operation("dgu-refresh");
   const timer = refreshLogger.time();

@@ -1,4 +1,5 @@
 import type { MongoDBService } from "@/core/mongodb";
+import type { PublicDayMenu, SitePresentation } from "@/core/types";
 
 export interface ScheduleEntry {
   day: number;
@@ -15,6 +16,7 @@ export interface ProviderConfig {
   dbName: string;
   collection: string;
   schedule: ScheduleEntry[];
+  presentation: SitePresentation;
 }
 
 export interface MealProvider {
@@ -24,13 +26,12 @@ export interface MealProvider {
   init(): Promise<void>;
   shutdown(): Promise<void>;
 
-  getMealData(date: string): Promise<unknown>;
-  refreshMealData(date: string): Promise<unknown>;
+  getMealData(date: string): Promise<PublicDayMenu>;
   getStats(): Promise<{ totalMealData: number; lastUpdated: Date | null }>;
   runRefresh(type: "today" | "all"): Promise<void>;
 
   /**
-   * Handle routes beyond the standard health/date/refresh.
+   * Handle routes beyond the standard health/date.
    * Return a JSON payload if handled, null to fall through to 404.
    */
   handleExtraRoute?(subPath: string, method: string): Promise<unknown | null>;

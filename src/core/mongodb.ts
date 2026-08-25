@@ -25,11 +25,17 @@ export class MongoDBService {
 
     try {
       logger.info(`Connecting to MongoDB: ${this.dbName}`);
-      this.client = new MongoClient(this.mongoUri, {
-        tls: true,
-        tlsAllowInvalidCertificates: true,
-        tlsAllowInvalidHostnames: true,
-      });
+      const isLocal = /localhost|127\.0\.0\.1/.test(this.mongoUri);
+      this.client = new MongoClient(
+        this.mongoUri,
+        isLocal
+          ? {}
+          : {
+              tls: true,
+              tlsAllowInvalidCertificates: true,
+              tlsAllowInvalidHostnames: true,
+            },
+      );
 
       await this.client.connect();
       this.db = this.client.db(this.dbName);

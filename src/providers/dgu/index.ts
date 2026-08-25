@@ -1,8 +1,9 @@
 import { CONFIG } from "@/core/config";
 import { MongoDBService } from "@/core/mongodb";
+import { cornerMenuToPublic } from "@/core/publicMenu";
+import type { PublicDayMenu } from "@/core/types";
 import { DGU_CONFIG } from "@/providers/dgu/config";
-import { getDguMenu, refreshDguMenu, runDguRefresh } from "@/providers/dgu/service";
-import type { DguMenu } from "@/providers/dgu/types";
+import { getDguMenu, runDguRefresh } from "@/providers/dgu/service";
 import type { MealProvider } from "@/providers/types";
 
 export function createDguProvider(): MealProvider {
@@ -22,12 +23,8 @@ export function createDguProvider(): MealProvider {
       await db.disconnect();
     },
 
-    async getMealData(date: string): Promise<DguMenu> {
-      return getDguMenu(db, date);
-    },
-
-    async refreshMealData(date: string): Promise<DguMenu> {
-      return refreshDguMenu(db, date);
+    async getMealData(date: string): Promise<PublicDayMenu> {
+      return cornerMenuToPublic(config.presentation.meals, (await getDguMenu(db, date)).meals);
     },
 
     async getStats() {

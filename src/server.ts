@@ -1,5 +1,6 @@
 import { serve } from "bun";
 import { CONFIG } from "@/core/config";
+import { buildApiDocs } from "@/core/docs";
 import { getCorsHeaders, handleCors } from "@/core/cors";
 import { ApiError, handleError } from "@/core/errors";
 import { logger } from "@/core/logger";
@@ -7,7 +8,7 @@ import type { SchedulerHandle } from "@/core/scheduler";
 import { setupScheduler } from "@/core/scheduler";
 import type { HealthCheckResponse, MealResponse } from "@/core/types";
 import { initializeRegistry } from "@/providers/init";
-import { isValidDate } from "@/utils/date";
+import { formatDate, isValidDate } from "@/utils/date";
 
 function jsonResponse(body: unknown, origin: string | null, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -59,11 +60,22 @@ export async function createServer() {
                 requestId,
                 timestamp: new Date().toISOString(),
                 message: "api.밥.net",
-                providers: providers.map((provider) => ({
-                  id: provider.config.id,
-                  name: provider.config.name,
-                  basePath: provider.config.basePath,
-                })),
+                providers: providers.map((provider) => provider.config.presentation),
+              },
+              origin,
+            );
+            requestLogger.response(response.status, Date.now() - startTime);
+            return response;
+          }
+
+          if (path === "/docs" && method === "GET") {
+            const presentations = providers.map((provider) => provider.config.presentation);
+            const response = jsonResponse(
+              {
+                requestId,
+                timestamp: new Date().toISOString(),
+                providers: presentations,
+                docs: buildApiDocs(presentations, CONFIG.PUBLIC_API_URL, formatDate(new Date())),
               },
               origin,
             );
@@ -93,24 +105,9 @@ export async function createServer() {
             };
             response = jsonResponse(body, origin);
           } else {
-            const refreshMatch = subPath.match(/^\/refresh\/(\d{4}-\d{2}-\d{2})$/);
             const dateMatch = subPath.match(/^\/(\d{4}-\d{2}-\d{2})$/);
 
-            if (refreshMatch && method === "POST") {
-              const apiKey = req.headers.get("Authorization")?.replace("Bearer ", "");
-              if (!CONFIG.REFRESH_API_KEY || apiKey !== CONFIG.REFRESH_API_KEY) {
-                throw new ApiError(401, "Unauthorized");
-              }
-
-              const date = refreshMatch[1];
-              if (!isValidDate(date)) {
-                throw new ApiError(400, "Invalid date format");
-              }
-
-              const data = await provider.refreshMealData(date);
-              const body: MealResponse = { requestId, timestamp: new Date().toISOString(), date, data };
-              response = jsonResponse(body, origin);
-            } else if (dateMatch) {
+            if (dateMatch && method === "GET") {
               const date = dateMatch[1];
               if (!isValidDate(date)) {
                 throw new ApiError(400, "Invalid date format");

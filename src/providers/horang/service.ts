@@ -62,20 +62,6 @@ export async function getHorangMenu(db: MongoDBService, dateParam: string): Prom
   return getCachedMealDataOrThrow<HorangMenu>(db, dateParam);
 }
 
-export async function refreshHorangMenu(db: MongoDBService, dateParam: string): Promise<HorangMenu> {
-  const articles = await fetchArticleList();
-  const article = findArticleForDate(articles, dateParam);
-
-  if (!article) {
-    const data = emptyMenu();
-    await db.saveMealData(dateParam, data);
-    return data;
-  }
-
-  const weekData = await refreshWeekFromArticle(db, article);
-  return weekData.get(dateParam) ?? emptyMenu();
-}
-
 export async function runHorangRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {
   const refreshLogger = logger.operation("horang-refresh");
   const timer = refreshLogger.time();

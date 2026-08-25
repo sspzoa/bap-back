@@ -4,8 +4,8 @@ export const CONFIG = {
     HOST: process.env.HOST || "localhost",
   },
   MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017",
-  REFRESH_API_KEY: process.env.REFRESH_API_KEY || "",
   MINDLOGIC_KEY: process.env.MINDLOGIC_KEY || "",
+  PUBLIC_API_URL: process.env.PUBLIC_API_URL || "https://api.밥.net",
   HTTP: {
     RETRY: {
       COUNT: 3,

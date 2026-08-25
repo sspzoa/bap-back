@@ -1,4 +1,3 @@
-import { MealNotFoundError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import { getCachedMealDataOrThrow } from "@/core/mealLookup";
 import type { MongoDBService } from "@/core/mongodb";
@@ -44,17 +43,6 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
 
 export async function getCafeteriaData(db: MongoDBService, dateParam: string): Promise<CafeteriaData> {
   return getCachedMealDataOrThrow<CafeteriaData>(db, dateParam);
-}
-
-export async function refreshSpecificDate(db: MongoDBService, dateParam: string): Promise<CafeteriaData> {
-  const weekData = await getWeekMealData(db, dateParam);
-  const dayData = weekData[dateParam];
-
-  if (!dayData) {
-    throw new MealNotFoundError();
-  }
-
-  return dayData;
 }
 
 export async function searchLatestFoodImage(db: MongoDBService, foodName: string): Promise<FoodSearchResult | null> {

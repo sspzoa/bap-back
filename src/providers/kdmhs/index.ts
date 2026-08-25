@@ -1,14 +1,14 @@
 import { CONFIG } from "@/core/config";
 import { ApiError } from "@/core/errors";
 import { MongoDBService } from "@/core/mongodb";
+import { cafeteriaToPublic } from "@/core/publicMenu";
+import type { PublicDayMenu } from "@/core/types";
 import { KDMHS_CONFIG } from "@/providers/kdmhs/config";
 import {
   getCafeteriaData,
-  refreshSpecificDate,
   runKdmhsRefresh,
   searchLatestFoodImage,
 } from "@/providers/kdmhs/service";
-import type { CafeteriaData } from "@/providers/kdmhs/types";
 import type { MealProvider } from "@/providers/types";
 
 export function createKdmhsProvider(): MealProvider {
@@ -28,12 +28,8 @@ export function createKdmhsProvider(): MealProvider {
       await db.disconnect();
     },
 
-    async getMealData(date: string): Promise<CafeteriaData> {
-      return getCafeteriaData(db, date);
-    },
-
-    async refreshMealData(date: string): Promise<CafeteriaData> {
-      return refreshSpecificDate(db, date);
+    async getMealData(date: string): Promise<PublicDayMenu> {
+      return cafeteriaToPublic(config.presentation.meals, await getCafeteriaData(db, date));
     },
 
     async getStats() {

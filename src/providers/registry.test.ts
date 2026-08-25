@@ -11,6 +11,16 @@ function fakeProvider(id: string, basePath: string): MealProvider {
     dbName: id,
     collection: "meal_data",
     schedule: [],
+    presentation: {
+      id,
+      name: id,
+      schoolName: id,
+      basePath,
+      description: id,
+      keywords: [],
+      features: { foodSearch: false },
+      meals: [],
+    },
   };
 
   return {
@@ -18,8 +28,7 @@ function fakeProvider(id: string, basePath: string): MealProvider {
     db: {} as MongoDBService,
     init: async () => {},
     shutdown: async () => {},
-    getMealData: async () => ({}),
-    refreshMealData: async () => ({}),
+    getMealData: async () => ({ meals: [] }),
     getStats: async () => ({ totalMealData: 0, lastUpdated: null }),
     runRefresh: async () => {},
   };
