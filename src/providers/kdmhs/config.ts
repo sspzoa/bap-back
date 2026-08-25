@@ -4,7 +4,7 @@ export const KDMHS_CONFIG: ProviderConfig = {
   id: "kdmhs",
   name: "한국디지털미디어고등학교",
   basePath: "/kdmhs",
-  origins: ["https://xn--rh3b.net", "https://밥.net"],
+  origins: ["https://kdmhs.xn--rh3b.net", "https://kdmhs.밥.net"],
   dbName: "bap",
   collection: "meal_data",
   schedule: [
