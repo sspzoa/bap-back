@@ -23,8 +23,8 @@ const SITE_PRESENTATION_FIELDS: ApiDocsField[] = [
   { name: "schoolName", type: "string", description: "학교·식당 공식 이름" },
   { name: "basePath", type: "string", description: "라우트 prefix (예: /kdmhs)" },
   { name: "description", type: "string", description: "한 줄 소개" },
-  { name: "keywords", type: "string[]", description: "검색·SEO. MCP get_meals 이름 매칭에도 쓰여요" },
-  { name: "features.foodSearch", type: "boolean", description: "true면 GET /{id}/search/{food} 와 search_food 도구" },
+  { name: "keywords", type: "string[]", description: "검색·SEO. MCP bap_get_meals 이름 매칭에도 쓰여요" },
+  { name: "features.foodSearch", type: "boolean", description: "true면 GET /{id}/search/{food} 와 bap_search_food 도구" },
   { name: "meals", type: "MealSlotMeta[]", description: "끼니 슬롯. 이 순서가 API·UI·MCP 응답 순서" },
 ];
 
@@ -89,7 +89,7 @@ cornerMenuToPublic(presentation.meals, mongoMeals)
       },
       {
         title: "5. 테스트와 문서",
-        body: "파서·매퍼 단위 테스트를 추가하고 bun test 를 돌립니다. GET /docs 와 MCP list_providers 는 등록된 presentation을 그대로 쓰므로 문서 문구를 하드코딩할 필요 없어요.",
+        body: "파서·매퍼 단위 테스트를 추가하고 bun test 를 돌립니다. GET /docs 와 MCP bap_list_providers 는 등록된 presentation을 그대로 쓰므로 문서 문구를 하드코딩할 필요 없어요.",
       },
       {
         title: "6. 프론트 에셋 (필요할 때만)",
@@ -103,7 +103,7 @@ cornerMenuToPublic(presentation.meals, mongoMeals)
           { name: "GET /", type: "catalog", description: "select, 홈, docs, PWA manifest" },
           { name: "GET /{id}/{date}", type: "meals", description: "통일 PublicDayMenu" },
           { name: "GET /{id}/health", type: "health", description: "문서 수·lastUpdated" },
-          { name: "POST /mcp", type: "MCP", description: "list_providers, get_meals, bap:// 리소스" },
+          { name: "POST /mcp", type: "MCP", description: "bap_list_providers, bap_get_meals, bap:// 리소스" },
           { name: "search", type: "optional", description: "features.foodSearch + handleExtraRoute 일 때만" },
         ],
       },
@@ -299,9 +299,9 @@ export function buildApiDocs(providers: SitePresentation[], baseUrl: string, exa
       ],
       responseExample: `{
   "tools": [
-    "list_providers — 등록된 학교·식당과 끼니 슬롯",
-    "get_meals — 날짜별 식단 (date 생략 시 오늘 KST)",
-    "search_food — 메뉴 사진 검색 (foodSearch 프로바이더)"
+    "bap_list_providers — 등록된 학교·식당과 끼니 슬롯",
+    "bap_get_meals — 날짜별 식단 (date 생략 시 오늘 KST)",
+    "bap_search_food — 메뉴 사진 검색 (foodSearch 프로바이더)"
   ],
   "resources": [
     "bap://providers",
@@ -312,14 +312,14 @@ export function buildApiDocs(providers: SitePresentation[], baseUrl: string, exa
         {
           title: "도구",
           rows: [
-            { name: "list_providers", type: "tool", description: "카탈로그. 인자 없음" },
+            { name: "bap_list_providers", type: "tool", description: "카탈로그. 인자 없음" },
             {
-              name: "get_meals",
+              name: "bap_get_meals",
               type: "tool",
               description: "provider(id 또는 이름), date?(YYYY-MM-DD), meal?(끼니 id/이름)",
             },
             {
-              name: "search_food",
+              name: "bap_search_food",
               type: "tool",
               description: "food(메뉴 이름), provider?(생략 시 foodSearch 첫 프로바이더)",
             },
@@ -330,7 +330,7 @@ export function buildApiDocs(providers: SitePresentation[], baseUrl: string, exa
         "Cursor: ~/.cursor/mcp.json 또는 프로젝트 .cursor/mcp.json 에 위 JSON을 넣으면 됩니다.",
         "프로토콜: MCP Streamable HTTP (2026-07-28). 2025-era 클라이언트도 지원해요.",
         "GET /mcp 는 알림 스트림, DELETE /mcp 는 세션 종료용입니다.",
-        "새 프로바이더를 등록하면 list_providers·get_meals·bap:// 리소스가 자동으로 포함됩니다. MCP 코드를 고칠 필요는 없어요.",
+        "새 프로바이더를 등록하면 bap_list_providers·bap_get_meals·bap:// 리소스가 자동으로 포함됩니다. MCP 코드를 고칠 필요는 없어요.",
       ],
     },
   ];

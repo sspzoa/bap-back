@@ -3,7 +3,7 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import { MealNotFoundError } from "@/core/errors";
 import type { PublicDayMenu, SitePresentation } from "@/core/types";
 import { createBapMcpHandler } from "@/mcp/handler";
-import type { McpMealSource } from "@/mcp/server";
+import { MCP_TOOLS, type McpMealSource } from "@/mcp/server";
 
 function presentation(id: string, name: string, schoolName: string, foodSearch: boolean): SitePresentation {
   return {
@@ -96,12 +96,17 @@ describe("밥.net MCP", () => {
   test("lists meal tools", async () => {
     const mcp = await client();
     const listed = await mcp.listTools();
-    expect(listed.tools.map((tool) => tool.name).sort()).toEqual(["get_meals", "list_providers", "search_food"]);
+    expect(listed.tools.map((tool) => tool.name).sort()).toEqual([
+      MCP_TOOLS.getMeals,
+      MCP_TOOLS.listProviders,
+      MCP_TOOLS.searchFood,
+    ]);
+    expect(listed.tools.find((tool) => tool.name === MCP_TOOLS.getMeals)?.description).toContain("bap_search_food");
   });
 
   test("list_providers returns catalog entries", async () => {
     const mcp = await client();
-    const result = await mcp.callTool({ name: "list_providers", arguments: {} });
+    const result = await mcp.callTool({ name: MCP_TOOLS.listProviders, arguments: {} });
     const body = JSON.parse(textOf(result));
     expect(body.providers.map((provider: { id: string }) => provider.id)).toEqual(["kdmhs", "dgu"]);
     expect(body.providers[0].features.foodSearch).toBe(true);
@@ -109,7 +114,7 @@ describe("밥.net MCP", () => {
 
   test("get_meals resolves a Korean name and defaults to today", async () => {
     const mcp = await client();
-    const result = await mcp.callTool({ name: "get_meals", arguments: { provider: "디미고" } });
+    const result = await mcp.callTool({ name: MCP_TOOLS.getMeals, arguments: { provider: "디미고" } });
     const body = JSON.parse(textOf(result));
     expect(body.date).toBe("2026-08-25");
     expect(body.meals[0].groups[0].items).toContain("흰쌀밥");
@@ -117,21 +122,21 @@ describe("밥.net MCP", () => {
 
   test("get_meals surfaces domain 404s", async () => {
     const mcp = await client();
-    const result = await mcp.callTool({ name: "get_meals", arguments: { provider: "kdmhs", date: "2020-01-01" } });
+    const result = await mcp.callTool({ name: MCP_TOOLS.getMeals, arguments: { provider: "kdmhs", date: "2020-01-01" } });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toBe("식단 정보가 없어요");
   });
 
   test("search_food finds a past menu photo", async () => {
     const mcp = await client();
-    const result = await mcp.callTool({ name: "search_food", arguments: { food: "김치전" } });
+    const result = await mcp.callTool({ name: MCP_TOOLS.searchFood, arguments: { food: "김치전" } });
     const body = JSON.parse(textOf(result));
     expect(body.image).toBe("https://img.example/kimchi");
   });
 
   test("search_food rejects providers without foodSearch", async () => {
     const mcp = await client();
-    const result = await mcp.callTool({ name: "search_food", arguments: { food: "김치전", provider: "dgu" } });
+    const result = await mcp.callTool({ name: MCP_TOOLS.searchFood, arguments: { food: "김치전", provider: "dgu" } });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain("지원하지 않");
   });

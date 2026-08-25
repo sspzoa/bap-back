@@ -18,7 +18,7 @@ HTTP (server.ts)
 
 - **Mongo 저장 형식**은 프로바이더마다 다릅니다 (급식 `breakfast/lunch/dinner` vs 코너 `meals[]`).
 - **API·MCP 응답**은 항상 `{ meals: PublicMeal[] }` 입니다.
-- **카탈로그** (`GET /`)는 각 프로바이더 `config.presentation`을 그대로 내려줍니다. 프론트와 MCP `list_providers`가 이걸 씁니다.
+- **카탈로그** (`GET /`)는 각 프로바이더 `config.presentation`을 그대로 내려줍니다. 프론트와 MCP `bap_list_providers`가 이걸 씁니다.
 
 ## 빠른 시작
 
@@ -142,9 +142,9 @@ Cursor (`~/.cursor/mcp.json` 또는 프로젝트 `.cursor/mcp.json`):
 
 | 도구 | 인자 | 설명 |
 |---|---|---|
-| `list_providers` | — | 등록된 학교·식당과 끼니 슬롯 |
-| `get_meals` | `provider`, `date?`, `meal?` | 날짜별 식단. `date` 생략 시 오늘(KST). `provider`는 id 또는 이름 |
-| `search_food` | `food`, `provider?` | 메뉴 사진 검색 (`foodSearch` 프로바이더) |
+| `bap_list_providers` | — | 등록된 학교·식당과 끼니 슬롯 |
+| `bap_get_meals` | `provider`, `date?`, `meal?` | 날짜별 식단. `date` 생략 시 오늘(KST). `provider`는 id 또는 이름 |
+| `bap_search_food` | `food`, `provider?` | 메뉴 사진 검색 (`foodSearch` 프로바이더) |
 
 리소스: `bap://providers`, `bap://meals/{provider}/{date}`.
 
@@ -183,7 +183,7 @@ Mongo 문서 envelope (공통):
 
 ## 새 프로바이더 추가
 
-백엔드만 추가하면 됩니다. HTTP `/{id}/{date}`, `GET /` 카탈로그, `GET /docs`, MCP (`list_providers` · `get_meals`), 프론트 `/select`·홈·docs·manifest가 **같은 presentation**으로 따라옵니다. bap-web에 `src/sites/{id}/` 나 프로바이더 id 하드코딩을 넣지 마세요.
+백엔드만 추가하면 됩니다. HTTP `/{id}/{date}`, `GET /` 카탈로그, `GET /docs`, MCP (`bap_list_providers` · `bap_get_meals`), 프론트 `/select`·홈·docs·manifest가 **같은 presentation**으로 따라옵니다. bap-web에 `src/sites/{id}/` 나 프로바이더 id 하드코딩을 넣지 마세요.
 
 공개 페이지 요약: [밥.net/docs#adding-provider](https://밥.net/docs#adding-provider)
 
@@ -228,7 +228,7 @@ src/providers/{id}/
   - 급식 `breakfast/lunch/dinner` + regular/plus/simple → `cafeteriaToPublic`
   - `meals[].time` + `corners[]` → `cornerMenuToPublic`
   - 그 외는 `PublicDayMenu`만 맞추면 됩니다.
-- 메뉴 사진 검색이 필요하면 `presentation.features.foodSearch: true` 와 `handleExtraRoute` (`/search/:food`)를 같이 구현합니다. MCP `search_food`가 이 경로를 재사용합니다.
+- 메뉴 사진 검색이 필요하면 `presentation.features.foodSearch: true` 와 `handleExtraRoute` (`/search/:food`)를 같이 구현합니다. MCP `bap_search_food`가 이 경로를 재사용합니다.
 - `server.ts`에 `/{id}` 라우트를 직접 추가하지 마세요. 레지스트리가 `health`·날짜·extra를 붙입니다.
 
 ### 4. 등록

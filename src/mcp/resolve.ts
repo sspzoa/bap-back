@@ -26,7 +26,7 @@ export function resolveProvider<T extends ResolvableProvider>(
 ): ResolveResult<T> {
   const needle = normalize(query);
   if (!needle) {
-    return { ok: false, message: "provider를 입력해 주세요. list_providers로 목록을 볼 수 있어요." };
+    return { ok: false, message: "provider를 입력해 주세요. bap_list_providers로 목록을 볼 수 있어요." };
   }
 
   if (providers.length === 0) {
