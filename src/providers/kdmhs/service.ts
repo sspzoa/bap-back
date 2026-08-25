@@ -1,8 +1,9 @@
-import { MealNoOperationError, MealNotFoundError } from "@/core/errors";
+import { MealNotFoundError } from "@/core/errors";
 import { logger } from "@/core/logger";
+import { getCachedMealDataOrThrow } from "@/core/mealLookup";
 import type { MongoDBService } from "@/core/mongodb";
 import type { CafeteriaData, FoodSearchResult, MealDataDocument } from "@/providers/kdmhs/types";
-import { formatDate, parseLocalDate } from "@/utils/date";
+import { formatDate } from "@/utils/date";
 import { isEmptyDay, parseWeekHtml } from "./parse";
 import { fetchWeekHtml } from "./scrape";
 import { findLatestFoodMatch } from "./search";
@@ -42,28 +43,7 @@ async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<Caf
 }
 
 export async function getCafeteriaData(db: MongoDBService, dateParam: string): Promise<CafeteriaData> {
-  const cachedData = await db.getMealData<CafeteriaData>(dateParam);
-  if (cachedData) {
-    return cachedData;
-  }
-
-  const collection = db.getCollection<MealDataDocument>();
-  const [earliest] = await collection.find().sort({ _id: 1 }).limit(1).toArray();
-  const [latest] = await collection.find().sort({ _id: -1 }).limit(1).toArray();
-
-  if (!earliest || !latest) {
-    throw new MealNotFoundError();
-  }
-
-  const targetDate = parseLocalDate(dateParam);
-  const earliestDate = parseLocalDate(earliest._id);
-  const latestDate = parseLocalDate(latest._id);
-
-  if (targetDate < earliestDate || targetDate > latestDate) {
-    throw new MealNotFoundError();
-  }
-
-  throw new MealNoOperationError();
+  return getCachedMealDataOrThrow<CafeteriaData>(db, dateParam);
 }
 
 export async function refreshSpecificDate(db: MongoDBService, dateParam: string): Promise<CafeteriaData> {

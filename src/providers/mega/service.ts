@@ -1,5 +1,5 @@
-import { MealNotFoundError } from "@/core/errors";
 import { logger } from "@/core/logger";
+import { getCachedMealDataOrThrow } from "@/core/mealLookup";
 import type { MongoDBService } from "@/core/mongodb";
 import { extractWeeklyMenu } from "@/providers/mega/ocr";
 import {
@@ -59,12 +59,7 @@ async function refreshWeekFromArticle(db: MongoDBService, article: MegaArticle):
 }
 
 export async function getMegaMenu(db: MongoDBService, dateParam: string): Promise<MegaMenu> {
-  const cachedData = await db.getMealData<MegaMenu>(dateParam);
-  if (cachedData) {
-    return cachedData;
-  }
-
-  throw new MealNotFoundError();
+  return getCachedMealDataOrThrow<MegaMenu>(db, dateParam);
 }
 
 export async function refreshMegaMenu(db: MongoDBService, dateParam: string): Promise<MegaMenu> {

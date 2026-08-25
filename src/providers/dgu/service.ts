@@ -1,5 +1,5 @@
-import { MealNotFoundError } from "@/core/errors";
 import { logger } from "@/core/logger";
+import { getCachedMealDataOrThrow } from "@/core/mealLookup";
 import type { MongoDBService } from "@/core/mongodb";
 import { extractWeeklyMenu } from "@/providers/dgu/ocr";
 import {
@@ -59,12 +59,7 @@ async function refreshWeekFromArticle(db: MongoDBService, article: DflexArticle)
 }
 
 export async function getDguMenu(db: MongoDBService, dateParam: string): Promise<DguMenu> {
-  const cachedData = await db.getMealData<DguMenu>(dateParam);
-  if (cachedData) {
-    return cachedData;
-  }
-
-  throw new MealNotFoundError();
+  return getCachedMealDataOrThrow<DguMenu>(db, dateParam);
 }
 
 export async function refreshDguMenu(db: MongoDBService, dateParam: string): Promise<DguMenu> {
