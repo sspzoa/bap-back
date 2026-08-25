@@ -9,6 +9,8 @@
 | `GET /kdmhs/health` | kdmhs |
 | `GET /dgu/:date` | dgu |
 | `GET /dgu/health` | dgu |
+| `GET /mega/:date` | mega |
+| `GET /mega/health` | mega |
 | `GET /` | 등록된 프로바이더 목록 |
 
 루트 `/:date` 같은 하위호환 경로는 없습니다.
