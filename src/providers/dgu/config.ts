@@ -4,7 +4,6 @@ export const DGU_CONFIG: ProviderConfig = {
   id: "dgu",
   name: "동국대학교 경영관 D-Flex",
   basePath: "/dgu",
-  origins: ["https://dflex.xn--rh3b.net", "https://dflex.밥.net"],
   dbName: "dgu-bap",
   collection: "meal_data",
   schedule: [

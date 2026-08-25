@@ -4,7 +4,6 @@ export const MEGA_CONFIG: ProviderConfig = {
   id: "mega",
   name: "메가스터디 구내식당",
   basePath: "/mega",
-  origins: ["https://mega.xn--rh3b.net", "https://mega.밥.net"],
   dbName: "mega-bap",
   collection: "meal_data",
   schedule: [

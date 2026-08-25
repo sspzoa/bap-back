@@ -8,7 +8,6 @@ function fakeProvider(id: string, basePath: string): MealProvider {
     id,
     name: id,
     basePath,
-    origins: [],
     dbName: id,
     collection: "meal_data",
     schedule: [],

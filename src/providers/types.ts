@@ -12,7 +12,6 @@ export interface ProviderConfig {
   name: string;
   /** Route prefix, e.g. "/kdmhs" or "/dgu" */
   basePath: string;
-  origins: string[];
   dbName: string;
   collection: string;
   schedule: ScheduleEntry[];

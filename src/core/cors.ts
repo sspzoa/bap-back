@@ -1,11 +1,8 @@
-import { getRegistry } from "@/providers/registry";
-
-const devOrigins = ["http://localhost:3000", "http://localhost:3001"];
+const FRONTEND_ORIGINS = ["https://밥.net", "https://xn--rh3b.net", "https://www.xn--rh3b.net"];
+const DEV_ORIGINS = ["http://localhost:3000", "http://localhost:3001"];
 
 function getAllowedOrigins(): string[] {
-  const registry = getRegistry();
-  const providerOrigins = registry.getAllOrigins();
-  return process.env.NODE_ENV === "production" ? providerOrigins : [...providerOrigins, ...devOrigins];
+  return process.env.NODE_ENV === "production" ? FRONTEND_ORIGINS : [...FRONTEND_ORIGINS, ...DEV_ORIGINS];
 }
 
 export function getCorsHeaders(origin: string | null): Record<string, string> {

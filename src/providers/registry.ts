@@ -29,10 +29,6 @@ export class ProviderRegistry {
 
     return fullPath.slice(prefix.length) || "/";
   }
-
-  getAllOrigins(): string[] {
-    return this.providers.flatMap((p) => p.config.origins);
-  }
 }
 
 let registry: ProviderRegistry | null = null;
