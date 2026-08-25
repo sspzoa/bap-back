@@ -140,7 +140,7 @@ export async function extractWeeklyMenu(
   const response = await client.chat.completions.create({
     model: OCR_MODEL,
     max_completion_tokens: 16000,
-    reasoning_effort: "low",
+    reasoning_effort: "none",
     tools: [MENU_TOOL],
     tool_choice: { type: "function", function: { name: TOOL_NAME } },
     messages: [
