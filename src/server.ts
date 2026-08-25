@@ -1,12 +1,14 @@
 import { serve } from "bun";
 import { CONFIG } from "@/core/config";
+import { getCorsHeaders, handleCors, isMcpPath, withCors } from "@/core/cors";
 import { buildApiDocs } from "@/core/docs";
-import { getCorsHeaders, handleCors } from "@/core/cors";
 import { ApiError, handleError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import type { SchedulerHandle } from "@/core/scheduler";
 import { setupScheduler } from "@/core/scheduler";
 import type { HealthCheckResponse, MealResponse } from "@/core/types";
+import { createBapMcpHandler } from "@/mcp/handler";
+import { sourcesFromProviders } from "@/mcp/server";
 import { initializeRegistry } from "@/providers/init";
 import { formatDate, isValidDate } from "@/utils/date";
 
@@ -32,6 +34,7 @@ export async function createServer() {
     }
 
     const schedulerHandles: (SchedulerHandle | null)[] = [];
+    const mcpHandler = createBapMcpHandler({ sources: sourcesFromProviders(providers) });
 
     const server = serve({
       port: CONFIG.SERVER.PORT,
@@ -66,6 +69,12 @@ export async function createServer() {
             );
             requestLogger.response(response.status, Date.now() - startTime);
             return response;
+          }
+
+          if (isMcpPath(path)) {
+            const mcpResponse = withCors(await mcpHandler.fetch(req), origin, path);
+            requestLogger.response(mcpResponse.status, Date.now() - startTime);
+            return mcpResponse;
           }
 
           if (path === "/docs" && method === "GET") {
@@ -161,6 +170,7 @@ export async function createServer() {
 
       logger.info("Shutting down server");
       try {
+        await mcpHandler.close();
         for (const handle of schedulerHandles) {
           handle?.cancel();
         }

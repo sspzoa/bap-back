@@ -36,6 +36,15 @@ describe("buildApiDocs", () => {
       "curl https://api.test/dgu/2026-08-25",
     ]);
     expect(docs.endpoints.find((e) => e.id === "search")?.curls[0]).toContain("/kdmhs/search/");
+    expect(docs.endpoints.find((e) => e.id === "mcp")).toMatchObject({
+      method: "POST",
+      path: "/mcp",
+    });
+    expect(docs.endpoints.find((e) => e.id === "mcp")?.curls[0]).toContain("https://api.test/mcp");
+    expect(docs.toc.map((item) => item.id)).toContain("adding-provider");
+    expect(docs.guides[0]).toMatchObject({ id: "adding-provider" });
+    expect(docs.guides[0].steps.length).toBeGreaterThanOrEqual(5);
+    expect(docs.typeSchemas.map((schema) => schema.title)).toContain("SitePresentation");
   });
 
   test("lists error messages from mealErrors", () => {
