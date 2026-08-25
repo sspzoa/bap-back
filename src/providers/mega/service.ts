@@ -64,7 +64,7 @@ export async function getMegaMenu(db: MongoDBService, dateParam: string): Promis
     return cachedData;
   }
 
-  throw new MealNotFoundError("학식 정보가 없어요");
+  throw new MealNotFoundError();
 }
 
 export async function refreshMegaMenu(db: MongoDBService, dateParam: string): Promise<MegaMenu> {

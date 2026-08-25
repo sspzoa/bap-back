@@ -1,4 +1,5 @@
 import { getCorsHeaders } from "@/core/cors";
+import { MEAL_ERROR_MESSAGES } from "@/core/mealErrors";
 import { logger } from "@/core/logger";
 
 export class ApiError extends Error {
@@ -13,14 +14,14 @@ export class ApiError extends Error {
 }
 
 export class MealNotFoundError extends ApiError {
-  constructor(message = "정보가 없어요") {
+  constructor(message = MEAL_ERROR_MESSAGES.noMealData) {
     super(404, message);
     this.name = "MealNotFoundError";
   }
 }
 
 export class MealNoOperationError extends ApiError {
-  constructor(message = "급식 운영이 없어요") {
+  constructor(message = MEAL_ERROR_MESSAGES.noMealOperation) {
     super(404, message);
     this.name = "MealNoOperationError";
   }

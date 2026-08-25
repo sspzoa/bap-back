@@ -52,7 +52,7 @@ export async function getCafeteriaData(db: MongoDBService, dateParam: string): P
   const [latest] = await collection.find().sort({ _id: -1 }).limit(1).toArray();
 
   if (!earliest || !latest) {
-    throw new MealNotFoundError("급식 정보가 없어요");
+    throw new MealNotFoundError();
   }
 
   const targetDate = parseLocalDate(dateParam);
@@ -60,7 +60,7 @@ export async function getCafeteriaData(db: MongoDBService, dateParam: string): P
   const latestDate = parseLocalDate(latest._id);
 
   if (targetDate < earliestDate || targetDate > latestDate) {
-    throw new MealNotFoundError("급식 정보가 없어요");
+    throw new MealNotFoundError();
   }
 
   throw new MealNoOperationError();
@@ -71,7 +71,7 @@ export async function refreshSpecificDate(db: MongoDBService, dateParam: string)
   const dayData = weekData[dateParam];
 
   if (!dayData) {
-    throw new MealNotFoundError("급식 정보가 없어요");
+    throw new MealNotFoundError();
   }
 
   return dayData;
