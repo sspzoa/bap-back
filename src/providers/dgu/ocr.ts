@@ -39,7 +39,7 @@ const MENU_TOOL: OpenAI.Chat.ChatCompletionFunctionTool = {
   type: "function",
   function: {
     name: TOOL_NAME,
-    description: "동국대학교 경영관 D-Flex 식당의 주간 식단표 이미지에서 추출한 메뉴를 날짜별로 제출합니다.",
+    description: "동국대학교 경영관 D-Flex 학식 주간 식단표 이미지에서 추출한 메뉴를 날짜별로 제출합니다.",
     strict: true,
     parameters: {
       type: "object",
@@ -106,7 +106,7 @@ const MENU_TOOL: OpenAI.Chat.ChatCompletionFunctionTool = {
 function buildPrompt(expectedDates: { date: string; weekday: string }[]): string {
   const dateLines = expectedDates.map((d) => `- ${d.date} (${d.weekday}요일)`).join("\n");
   return [
-    "이 이미지는 동국대학교 경영관 D-Flex 식당의 한 주간 식단표입니다.",
+    "이 이미지는 동국대학교 경영관 D-Flex 학식의 한 주간 식단표입니다.",
     "표의 가로(열)는 요일, 세로(행)는 식사 시간(중식·석식)과 코너입니다.",
     "중식은 보통 '일반식(A코너)'과 '특식(B코너)' 두 코너, 석식은 단일 코너입니다.",
     "각 칸에는 대표 메뉴, 그 아래 품목들이 들어 있고, 행 라벨 쪽에 코너 가격과 운영 시간이 있습니다.",

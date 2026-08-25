@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { CONFIG } from "@/core/config";
-import type { MenuImage } from "@/providers/mega/scrape";
-import type { MegaMeal } from "@/providers/mega/types";
+import type { MenuImage } from "@/providers/horang/scrape";
+import type { HorangMeal } from "@/providers/horang/types";
 
 const GATEWAY_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway";
 const OCR_MODEL = "gpt-5.6-luna";
@@ -37,7 +37,7 @@ const MENU_TOOL: OpenAI.Chat.ChatCompletionFunctionTool = {
   type: "function",
   function: {
     name: TOOL_NAME,
-    description: "메가스터디 구내식당 주간 식단표 이미지에서 추출한 메뉴를 날짜별로 제출합니다.",
+    description: "호랑에듀 구내식당 주간 식단표 이미지에서 추출한 메뉴를 날짜별로 제출합니다.",
     strict: true,
     parameters: {
       type: "object",
@@ -104,7 +104,7 @@ const MENU_TOOL: OpenAI.Chat.ChatCompletionFunctionTool = {
 function buildPrompt(expectedDates: { date: string; weekday: string }[]): string {
   const dateLines = expectedDates.map((d) => `- ${d.date} (${d.weekday}요일)`).join("\n");
   return [
-    "이 이미지는 메가스터디 구내식당(메가라운지)의 한 주간 식단표입니다.",
+    "이 이미지는 호랑에듀 구내식당(horang-edu)의 한 주간 식단표입니다.",
     "표의 가로(열)는 요일(월~금), 세로(행)는 식사 시간(점심·저녁)과 코너입니다.",
     "점심(중식)은 보통 '자율배식'과 'Take-Out' 두 코너, 저녁(석식)은 보통 '도시락'과 '샐러데이' 두 코너입니다.",
     "자율배식의 대표 메뉴는 빨간 점으로 표시되어 있습니다. 표에 있는 코너는 모두 추출하세요.",
@@ -124,15 +124,15 @@ function buildPrompt(expectedDates: { date: string; weekday: string }[]): string
 }
 
 /**
- * Run vision OCR on a weekly Megastudy menu image and return a map of
+ * Run vision OCR on a weekly Horang Edu menu image and return a map of
  * YYYY-MM-DD -> that day's meals (중식/석식 with their corners).
  */
 export async function extractWeeklyMenu(
   image: MenuImage,
   expectedDates: { date: string; weekday: string }[],
-): Promise<Map<string, MegaMeal[]>> {
+): Promise<Map<string, HorangMeal[]>> {
   if (!CONFIG.MINDLOGIC_KEY) {
-    throw new Error("MINDLOGIC_KEY is not configured; cannot run Megastudy menu OCR");
+    throw new Error("MINDLOGIC_KEY is not configured; cannot run Horang Edu menu OCR");
   }
 
   const client = new OpenAI({ apiKey: CONFIG.MINDLOGIC_KEY, baseURL: GATEWAY_BASE_URL });
@@ -156,14 +156,14 @@ export async function extractWeeklyMenu(
 
   const toolCall = response.choices[0]?.message.tool_calls?.[0];
   if (!toolCall || toolCall.type !== "function") {
-    throw new Error("Megastudy menu OCR returned no function tool call");
+    throw new Error("Horang Edu menu OCR returned no function tool call");
   }
 
   const result = JSON.parse(toolCall.function.arguments) as OcrResult;
-  const mealsByDate = new Map<string, MegaMeal[]>();
+  const mealsByDate = new Map<string, HorangMeal[]>();
 
   for (const day of result.days) {
-    const meals: MegaMeal[] = day.meals.map((meal) => ({
+    const meals: HorangMeal[] = day.meals.map((meal) => ({
       time: meal.time,
       operatingHours: emptyToNull(meal.operatingHours),
       corners: meal.corners.map((corner) => ({

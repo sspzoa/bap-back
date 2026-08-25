@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { MEGA_BLOG } from "@/providers/mega/config";
+import { HORANG_BLOG } from "@/providers/horang/config";
 import { formatDate, parseLocalDate } from "@/utils/date";
 import { fetchWithRetry } from "@/utils/fetch";
 
@@ -14,7 +14,7 @@ const NAVER_HEADERS = {
 /** 2026.08.24~08.28 / 2026.07.13~07.17 / 2025.3.3-3.7 */
 const WEEK_RANGE = /(\d{4})\.(\d{1,2})\.(\d{1,2})\s*[~～-]\s*(\d{1,2})\.(\d{1,2})/;
 
-export interface MegaArticle {
+export interface HorangArticle {
   logNo: string;
   title: string;
   /** YYYY-MM-DD, first operating day of the week */
@@ -73,20 +73,20 @@ function parsePostListJson(text: string): PostTitleListResponse {
   return JSON.parse(sanitized) as PostTitleListResponse;
 }
 
-/** Fetch one page of the 메가스터디 구내식당 메뉴표 category and keep weekly-menu posts. */
-export async function fetchArticleList(page = 1): Promise<MegaArticle[]> {
+/** Fetch one page of the 호랑에듀 구내식당 메뉴표 category and keep weekly-menu posts. */
+export async function fetchArticleList(page = 1): Promise<HorangArticle[]> {
   const params = new URLSearchParams({
-    blogId: MEGA_BLOG.BLOG_ID,
+    blogId: HORANG_BLOG.BLOG_ID,
     viewdate: "",
     currentPage: String(page),
-    categoryNo: String(MEGA_BLOG.CATEGORY_NO),
+    categoryNo: String(HORANG_BLOG.CATEGORY_NO),
     parentCategoryNo: "",
     countPerPage: "10",
   });
-  const html = await fetchText(`${MEGA_BLOG.LIST_URL}?${params.toString()}`, "application/json");
+  const html = await fetchText(`${HORANG_BLOG.LIST_URL}?${params.toString()}`, "application/json");
   const payload = parsePostListJson(html);
 
-  const articles: MegaArticle[] = [];
+  const articles: HorangArticle[] = [];
   for (const post of payload.postList ?? []) {
     const title = decodePostTitle(post.title);
     const range = parseWeekRange(title);
@@ -98,13 +98,13 @@ export async function fetchArticleList(page = 1): Promise<MegaArticle[]> {
 }
 
 /** Find the article whose operating week contains the given date. */
-export function findArticleForDate(articles: MegaArticle[], date: string): MegaArticle | null {
+export function findArticleForDate(articles: HorangArticle[], date: string): HorangArticle | null {
   return articles.find((article) => article.weekStart <= date && date <= article.weekEnd) ?? null;
 }
 
 /** Extract the weekly-menu image URL from a blog post. */
 export async function fetchArticleImageUrl(logNo: string): Promise<string | null> {
-  const url = `${MEGA_BLOG.POST_VIEW_URL}?blogId=${MEGA_BLOG.BLOG_ID}&logNo=${logNo}`;
+  const url = `${HORANG_BLOG.POST_VIEW_URL}?blogId=${HORANG_BLOG.BLOG_ID}&logNo=${logNo}`;
   const html = await fetchText(url, "text/html");
   const $ = cheerio.load(html);
 

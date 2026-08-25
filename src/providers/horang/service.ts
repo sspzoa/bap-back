@@ -1,21 +1,21 @@
 import { logger } from "@/core/logger";
 import { getCachedMealDataOrThrow } from "@/core/mealLookup";
 import type { MongoDBService } from "@/core/mongodb";
-import { extractWeeklyMenu } from "@/providers/mega/ocr";
+import { extractWeeklyMenu } from "@/providers/horang/ocr";
 import {
   enumerateWeekdays,
   fetchArticleImageUrl,
   fetchArticleList,
   fetchImage,
   findArticleForDate,
-  type MegaArticle,
-} from "@/providers/mega/scrape";
-import type { MegaMenu } from "@/providers/mega/types";
+  type HorangArticle,
+} from "@/providers/horang/scrape";
+import type { HorangMenu } from "@/providers/horang/types";
 import { formatDate, getWeekDates } from "@/utils/date";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
-function emptyMenu(): MegaMenu {
+function emptyMenu(): HorangMenu {
   return { meals: [] };
 }
 
@@ -28,10 +28,10 @@ function weekdayLabel(dateStr: string): string {
  * Fetch the post's menu image, OCR the whole week in one call, and persist
  * one document per operating day. Returns the per-date menu that was saved.
  */
-async function refreshWeekFromArticle(db: MongoDBService, article: MegaArticle): Promise<Map<string, MegaMenu>> {
-  const refreshLogger = logger.operation("mega-refresh-week");
+async function refreshWeekFromArticle(db: MongoDBService, article: HorangArticle): Promise<Map<string, HorangMenu>> {
+  const refreshLogger = logger.operation("horang-refresh-week");
   const dates = enumerateWeekdays(article.weekStart, article.weekEnd);
-  const result = new Map<string, MegaMenu>();
+  const result = new Map<string, HorangMenu>();
 
   const imageUrl = await fetchArticleImageUrl(article.logNo);
   if (!imageUrl) {
@@ -49,20 +49,20 @@ async function refreshWeekFromArticle(db: MongoDBService, article: MegaArticle):
   const mealsByDate = await extractWeeklyMenu(image, expectedDates);
 
   for (const date of dates) {
-    const data: MegaMenu = { meals: mealsByDate.get(date) ?? [] };
+    const data: HorangMenu = { meals: mealsByDate.get(date) ?? [] };
     await db.saveMealData(date, data);
     result.set(date, data);
-    refreshLogger.info(`Saved Megastudy ${date}: ${data.meals.length} meals`);
+    refreshLogger.info(`Saved Horang Edu ${date}: ${data.meals.length} meals`);
   }
 
   return result;
 }
 
-export async function getMegaMenu(db: MongoDBService, dateParam: string): Promise<MegaMenu> {
-  return getCachedMealDataOrThrow<MegaMenu>(db, dateParam);
+export async function getHorangMenu(db: MongoDBService, dateParam: string): Promise<HorangMenu> {
+  return getCachedMealDataOrThrow<HorangMenu>(db, dateParam);
 }
 
-export async function refreshMegaMenu(db: MongoDBService, dateParam: string): Promise<MegaMenu> {
+export async function refreshHorangMenu(db: MongoDBService, dateParam: string): Promise<HorangMenu> {
   const articles = await fetchArticleList();
   const article = findArticleForDate(articles, dateParam);
 
@@ -76,12 +76,12 @@ export async function refreshMegaMenu(db: MongoDBService, dateParam: string): Pr
   return weekData.get(dateParam) ?? emptyMenu();
 }
 
-export async function runMegaRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {
-  const refreshLogger = logger.operation("mega-refresh");
+export async function runHorangRefresh(db: MongoDBService, refreshType: "today" | "all"): Promise<void> {
+  const refreshLogger = logger.operation("horang-refresh");
   const timer = refreshLogger.time();
 
   try {
-    refreshLogger.info(`Starting Megastudy cafeteria data refresh (${refreshType})`);
+    refreshLogger.info(`Starting Horang Edu cafeteria data refresh (${refreshType})`);
 
     const today = formatDate(new Date());
     const targetDates =
@@ -92,7 +92,7 @@ export async function runMegaRefresh(db: MongoDBService, refreshType: "today" | 
     const articles = await fetchArticleList(1);
 
     const processed = new Set<string>();
-    const toProcess: MegaArticle[] = [];
+    const toProcess: HorangArticle[] = [];
     for (const date of targetDates) {
       const article = findArticleForDate(articles, date);
       if (article && !processed.has(article.logNo)) {
@@ -107,17 +107,17 @@ export async function runMegaRefresh(db: MongoDBService, refreshType: "today" | 
     for (const article of toProcess) {
       try {
         await refreshWeekFromArticle(db, article);
-        refreshLogger.info(`✓ Completed Megastudy week ${article.weekStart} ~ ${article.weekEnd}`);
+        refreshLogger.info(`✓ Completed Horang Edu week ${article.weekStart} ~ ${article.weekEnd}`);
         successCount++;
       } catch (error) {
         errorCount++;
-        refreshLogger.error(`✗ Failed Megastudy week ${article.weekStart} ~ ${article.weekEnd}`, error);
+        refreshLogger.error(`✗ Failed Horang Edu week ${article.weekStart} ~ ${article.weekEnd}`, error);
       }
     }
 
-    timer(`Megastudy refresh completed (${refreshType}): ${successCount} success, ${errorCount} errors`);
+    timer(`Horang Edu refresh completed (${refreshType}): ${successCount} success, ${errorCount} errors`);
   } catch (error) {
-    refreshLogger.error("Megastudy cafeteria refresh failed", error);
+    refreshLogger.error("Horang Edu cafeteria refresh failed", error);
     throw error;
   }
 }

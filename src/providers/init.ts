@@ -1,6 +1,6 @@
 import { createDguProvider } from "@/providers/dgu";
 import { createKdmhsProvider } from "@/providers/kdmhs";
-import { createMegaProvider } from "@/providers/mega";
+import { createHorangProvider } from "@/providers/horang";
 import { getRegistry, type ProviderRegistry } from "@/providers/registry";
 
 export function initializeRegistry(): ProviderRegistry {
@@ -10,7 +10,7 @@ export function initializeRegistry(): ProviderRegistry {
   if (reg.getProviders().length === 0) {
     reg.register(createKdmhsProvider());
     reg.register(createDguProvider());
-    reg.register(createMegaProvider());
+    reg.register(createHorangProvider());
   }
 
   return reg;

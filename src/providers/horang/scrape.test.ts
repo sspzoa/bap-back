@@ -3,12 +3,12 @@ import {
   decodePostTitle,
   enumerateWeekdays,
   findArticleForDate,
-  type MegaArticle,
+  type HorangArticle,
   parseWeekRange,
   toOriginalImageUrl,
 } from "./scrape";
 
-function article(weekStart: string, weekEnd: string, logNo = "1"): MegaArticle {
+function article(weekStart: string, weekEnd: string, logNo = "1"): HorangArticle {
   return { logNo, title: `${weekStart} ~ ${weekEnd}`, weekStart, weekEnd };
 }
 
