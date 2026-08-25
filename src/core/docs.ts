@@ -337,7 +337,7 @@ export function buildApiDocs(providers: SitePresentation[], baseUrl: string, exa
 
   return {
     title: "API",
-    subtitle: "학교·대학·구내식당 식단을 JSON과 MCP로 가져옵니다. 공개 엔드포인트는 인증이 필요 없어요.",
+    subtitle: "프로바이더 카탈로그와 통일 식단 스키마. HTTP와 MCP가 같은 데이터를 쓰고, 백엔드만 추가하면 프론트가 따라옵니다.",
     baseUrl,
     exampleDate,
     toc: [

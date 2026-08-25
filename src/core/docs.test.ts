@@ -41,6 +41,8 @@ describe("buildApiDocs", () => {
       path: "/mcp",
     });
     expect(docs.endpoints.find((e) => e.id === "mcp")?.curls[0]).toContain("https://api.test/mcp");
+    expect(docs.subtitle).toContain("카탈로그");
+    expect(docs.subtitle).toContain("통일 식단 스키마");
     expect(docs.toc.map((item) => item.id)).toContain("adding-provider");
     expect(docs.guides[0]).toMatchObject({ id: "adding-provider" });
     expect(docs.guides[0].steps.length).toBeGreaterThanOrEqual(5);
