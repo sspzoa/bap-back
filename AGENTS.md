@@ -12,7 +12,7 @@ Pair repo: **bap-web** (Next.js frontend). API docs: [api.밥.net/docs](https://
 - **Public boundary** — never expose raw Mongo `data` on HTTP. Transform with `cafeteriaToPublic` or `cornerMenuToPublic` in `src/core/publicMenu.ts`.
 - **Presentation in config** — `ProviderConfig.presentation` (`SitePresentation`) drives `GET /` catalog and slot order for API meals.
 - **Mongo envelope** — always `{ _id: YYYY-MM-DD, data, createdAt, updatedAt }` via `MongoDBService.saveMealData`.
-- **Routes** — meal routes only under `/{basePath}/…` (e.g. `/kdmhs/2026-08-25`). Root exceptions: `/`, `/docs`, `/mcp`. No `/:date` legacy paths.
+- **Routes** — meal routes only under `/{basePath}/…` (e.g. `/kdmhs/2026-08-25`). Root exceptions: `/`, `/changelog`, `/docs`, `/mcp`. No `/:date` legacy paths.
 - **Errors** — use `MealNotFoundError` / `MealNoOperationError` from `src/core/mealErrors.ts` for domain 404s; `ApiError` for HTTP errors.
 - **Tests** — add unit tests for parsers, `publicMenu` mappers, and MCP tools. Run `bun test` before finishing.
 - **Keep `/docs` in sync** — OpenAPI lives in `src/core/docs.ts` (`GET /docs` Scalar, `GET /docs/openapi.json`). MCP tools stay aligned with the same public schema.
@@ -36,6 +36,8 @@ Pair repo: **bap-web** (Next.js frontend). API docs: [api.밥.net/docs](https://
 | `src/mcp/server.ts` | MCP tools (`bap_list_providers`, `bap_get_meals`, `bap_search_food`) |
 | `src/core/types.ts` | Public API types |
 | `src/core/version.ts` | `APP_VERSION` — OpenAPI, MCP, `package.json`과 동기화 |
+| `CHANGELOG.md` | 사용자-facing 변경 이력 (`GET /changelog`) |
+| `src/core/changelog.ts` | CHANGELOG.md 로더 |
 | `src/core/mongodb.ts` | Upsert / read by date |
 | `src/core/mealLookup.ts` | Cache miss → 404 semantics |
 | `src/providers/{id}/config.ts` | `presentation`, schedule, dbName |
@@ -65,8 +67,9 @@ Full walkthrough: [README.md](./README.md#새-프로바이더-추가) · public 
 
 - **단일 소스** — `src/core/version.ts`의 `APP_VERSION`. OpenAPI·MCP는 여기서 읽는다.
 - **함께 수정** — `package.json` `"version"`. **bap-web**도 같은 semver (`BRAND.version`, `package.json`).
+- **CHANGELOG** — 루트 `CHANGELOG.md`에 `## [버전] - YYYY-MM-DD` 섹션 추가. [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식. `GET /changelog`로 프론트에 전달 — **bap-back만** 수정한다.
 - **규칙** — 기본은 patch +1 (`2.0.0` → `2.0.1`). 사용자-facing 기능 추가는 minor. `PublicDayMenu`·HTTP 계약 breaking은 major.
-- **체크** — 버전 bump 없이 푸시/커밋하지 않는다.
+- **체크** — 버전 bump 없이 푸시/커밋하지 않는다. CHANGELOG 없이 버전만 올리지 않는다.
 
 ## Environment
 
@@ -102,5 +105,6 @@ bun run lint
 - [ ] README + OpenAPI (`GET /docs`) still accurate
 - [ ] No bap-web hardcoded provider id; MCP needs no extra change for a standard provider
 - [ ] Version bumped (`APP_VERSION`, `package.json`) and matches bap-web if both repos ship together
+- [ ] `CHANGELOG.md` updated for the new version
 
 See [README.md](./README.md) for full API reference and deployment.

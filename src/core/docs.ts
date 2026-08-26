@@ -60,6 +60,7 @@ export function buildOpenApiDocument(
     servers: [{ url: baseUrl, description: "프로덕션" }],
     tags: [
       { name: "Catalog", description: "등록된 사이트와 화면 구성에 필요한 메타데이터" },
+      { name: "Changelog", description: "semver별 사용자-facing 변경 이력" },
       { name: "Meals", description: "날짜별 식단 조회" },
       { name: "Search", description: "메뉴 이름으로 과거 급식 사진 찾기 (`foodSearch` 지원 프로바이더 전용)" },
       { name: "Health", description: "프로바이더별 데이터 적재 상태" },
@@ -79,6 +80,24 @@ export function buildOpenApiDocument(
               content: {
                 "application/json": {
                   schema: { $ref: "#/components/schemas/CatalogResponse" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/changelog": {
+        get: {
+          tags: ["Changelog"],
+          summary: "CHANGELOG 조회",
+          description: "루트 `CHANGELOG.md` 원문. 프론트 홈 업데이트 내역이 이 `markdown` 필드를 기본 마크다운으로 렌더합니다.",
+          operationId: "getChangelog",
+          responses: {
+            "200": {
+              description: "파싱된 CHANGELOG",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ChangelogResponse" },
                 },
               },
             },
@@ -281,6 +300,16 @@ export function buildOpenApiDocument(
             timestamp: { type: "string", format: "date-time" },
             message: { type: "string", example: "api.밥.net" },
             providers: { type: "array", items: { $ref: "#/components/schemas/SitePresentation" } },
+          },
+        },
+        ChangelogResponse: {
+          type: "object",
+          required: ["requestId", "timestamp", "version", "markdown"],
+          properties: {
+            requestId: { type: "string" },
+            timestamp: { type: "string", format: "date-time" },
+            version: { type: "string", example: APP_VERSION },
+            markdown: { type: "string", description: "CHANGELOG.md 원문 (Markdown)" },
           },
         },
         SitePresentation: {

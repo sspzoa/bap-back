@@ -57,3 +57,10 @@ export interface PublicMeal {
 export interface PublicDayMenu {
   meals: PublicMeal[];
 }
+
+export interface ChangelogResponse {
+  requestId: string;
+  timestamp: string;
+  version: string;
+  markdown: string;
+}

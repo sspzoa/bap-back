@@ -2,11 +2,13 @@ import { serve } from "bun";
 import { CONFIG } from "@/core/config";
 import { getCorsHeaders, handleCors, isMcpPath, withCors } from "@/core/cors";
 import { buildOpenApiDocument, renderScalarHtml } from "@/core/docs";
+import { loadChangelogMarkdown } from "@/core/changelog";
 import { ApiError, handleError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import type { SchedulerHandle } from "@/core/scheduler";
 import { setupScheduler } from "@/core/scheduler";
-import type { HealthCheckResponse, MealResponse } from "@/core/types";
+import type { ChangelogResponse, HealthCheckResponse, MealResponse } from "@/core/types";
+import { APP_VERSION } from "@/core/version";
 import { createBapMcpHandler } from "@/mcp/handler";
 import { sourcesFromProviders } from "@/mcp/server";
 import { initializeRegistry } from "@/providers/init";
@@ -93,6 +95,19 @@ export async function createServer() {
             const presentations = providers.map((provider) => provider.config.presentation);
             const spec = buildOpenApiDocument(presentations, `${url.protocol}//${url.host}`, formatDate(new Date()));
             const response = jsonResponse(spec, origin);
+            requestLogger.response(response.status, Date.now() - startTime);
+            return response;
+          }
+
+          if (path === "/changelog" && method === "GET") {
+            const markdown = await loadChangelogMarkdown();
+            const body: ChangelogResponse = {
+              requestId,
+              timestamp: new Date().toISOString(),
+              version: APP_VERSION,
+              markdown,
+            };
+            const response = jsonResponse(body, origin);
             requestLogger.response(response.status, Date.now() - startTime);
             return response;
           }

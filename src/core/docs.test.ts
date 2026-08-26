@@ -33,6 +33,7 @@ describe("buildOpenApiDocument", () => {
     expect(spec.openapi).toBe("3.1.0");
     expect(spec.servers[0].url).toBe("https://api.test");
     expect(spec.paths["/"]).toBeDefined();
+    expect(spec.paths["/changelog"]).toBeDefined();
     expect(spec.paths["/{provider}/{date}"]).toBeDefined();
     expect(spec.paths["/{provider}/search/{food}"]).toBeDefined();
     expect(spec.paths["/{provider}/health"]).toBeDefined();
