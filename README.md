@@ -7,9 +7,9 @@
 ## 아키텍처
 
 ```
-HTTP (server.ts)
+HTTP (Elysia, src/http/app.ts)
   ├─ GET  /            카탈로그 (presentation[])
-  ├─ GET  /docs        Scalar (스펙: /docs/openapi.json)
+  ├─ GET  /docs        Scalar (`@elysiajs/openapi`, 스펙: /docs/openapi.json)
   ├─ POST /mcp         MCP Streamable HTTP (같은 프로바이더 레이어)
   └─ ProviderRegistry ── kdmhs | dgu | horang | …
          ├─ scrape / parse / OCR  →  MongoDB (프로바이더별 DB)
@@ -228,8 +228,8 @@ src/providers/{id}/
   - 급식 `breakfast/lunch/dinner` + regular/plus/simple → `cafeteriaToPublic`
   - `meals[].time` + `corners[]` → `cornerMenuToPublic`
   - 그 외는 `PublicDayMenu`만 맞추면 됩니다.
-- 메뉴 사진 검색이 필요하면 `presentation.features.foodSearch: true` 와 `handleExtraRoute` (`/search/:food`)를 같이 구현합니다. MCP `bap_search_food`가 이 경로를 재사용합니다.
-- `server.ts`에 `/{id}` 라우트를 직접 추가하지 마세요. 레지스트리가 `health`·날짜·extra를 붙입니다.
+- 메뉴 사진 검색이 필요하면 `presentation.features.foodSearch: true` 와 `handleExtraRoute` (`/search/:food`)를 같이 구현합니다. Elysia `GET /:provider/search/:food`와 MCP `bap_search_food`가 이 훅을 재사용합니다.
+- `src/http/app.ts`에 프로바이더 전용 경로를 추가하지 마세요. 표준 라우트는 `/:provider/health`, `/:provider/:date`, `/:provider/search/:food`입니다.
 
 ### 4. 등록
 
@@ -237,7 +237,7 @@ src/providers/{id}/
 
 ### 5. 테스트
 
-파서·매퍼 단위 테스트를 넣고 `bun test`를 돌립니다. HTTP 통합·Mongo·OCR 테스트는 없습니다.
+파서·매퍼 단위 테스트를 넣고 `bun test`를 돌립니다. 라우트 계약은 `src/http/app.test.ts`에서 `app.handle`로 검증합니다. Mongo·OCR 테스트는 없습니다.
 
 ### 6. 프론트
 
@@ -247,7 +247,7 @@ src/providers/{id}/
 
 - [ ] `getMealData`가 `PublicDayMenu`를 반환한다
 - [ ] `presentation.meals` (id, title, icon, background, `activeUntilHour`)가 완전하다
-- [ ] `init.ts`에만 등록했고 `server.ts`에 경로를 넣지 않았다
+- [ ] `init.ts`에만 등록했고 `src/http/app.ts`에 경로를 넣지 않았다
 - [ ] 파서·매퍼 테스트가 있다
 - [ ] bap-web에 프로바이더 id를 하드코딩하지 않았다
 - [ ] `foodSearch`를 켜면 `handleExtraRoute`도 구현했다
@@ -256,10 +256,11 @@ src/providers/{id}/
 
 ```
 src/
-  core/          공통 타입, Mongo, publicMenu, OpenAPI/Scalar, 스케줄러
+  core/          공통 타입, Mongo, publicMenu, 스케줄러
+  http/          Elysia 앱, `t` 모델, OpenAPI 메타
   mcp/           MCP 도구·리소스 (프로바이더 레이어 재사용)
   providers/     프로바이더별 scrape·service·config
-  server.ts      HTTP 라우팅 (`/`, `/docs`, `/mcp`, `/{id}/…`)
+  server.ts      프로바이더 init · listen · 스케줄러 · shutdown
   index.ts       진입점
 ```
 
@@ -269,7 +270,7 @@ src/
 bun test
 ```
 
-변환·라우팅·파싱 단위 테스트 포함. HTTP 통합·OCR·Mongo 테스트는 없음.
+변환·라우팅·파싱 단위 테스트와 Elysia `app.handle` HTTP 테스트 포함. OCR·Mongo 테스트는 없음.
 
 ## 배포
 

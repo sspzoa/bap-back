@@ -13,9 +13,9 @@ Pair repo: **bap-web** (Next.js frontend). API docs: [api.밥.net/docs](https://
 - **Presentation in config** — `ProviderConfig.presentation` (`SitePresentation`) drives `GET /` catalog and slot order for API meals.
 - **Mongo envelope** — always `{ _id: YYYY-MM-DD, data, createdAt, updatedAt }` via `MongoDBService.saveMealData`.
 - **Routes** — meal routes only under `/{basePath}/…` (e.g. `/kdmhs/2026-08-25`). Root exceptions: `/`, `/changelog`, `/docs`, `/mcp`. No `/:date` legacy paths.
-- **Errors** — use `MealNotFoundError` / `MealNoOperationError` from `src/core/mealErrors.ts` for domain 404s; `ApiError` for HTTP errors.
+- **Errors** — domain 404s throw `MealNotFoundError` / `MealNoOperationError`; HTTP 레이어는 Elysia `status()`. `onError`가 둘 다 `{ requestId, timestamp, error }`로 맞춘다.
 - **Tests** — add unit tests for parsers, `publicMenu` mappers, and MCP tools. Run `bun test` before finishing.
-- **Keep `/docs` in sync** — OpenAPI lives in `src/core/docs.ts` (`GET /docs` Scalar, `GET /docs/openapi.json`). MCP tools stay aligned with the same public schema.
+- **Keep `/docs` in sync** — OpenAPI is generated from Elysia routes (`t` schemas + `detail`) via `@elysiajs/openapi` (`GET /docs`, `GET /docs/openapi.json`). MCP tools stay aligned with the same public schema.
 - **Version on push** — 커밋·푸시 전에 semver를 올리고 **bap-web과 같은 번호**로 맞춘다. 아래 [Versioning](#versioning) 참고.
 
 ## Don't
@@ -29,10 +29,11 @@ Pair repo: **bap-web** (Next.js frontend). API docs: [api.밥.net/docs](https://
 
 | Path | Role |
 |---|---|
-| `src/server.ts` | HTTP routing, CORS |
+| `src/http/app.ts` | Elysia HTTP (`cors`, `openapi`, 라우트) |
+| `src/http/models.ts` | 공개 응답 `t` 스키마 |
+| `src/server.ts` | 프로바이더 init, listen, 스케줄러, shutdown |
 | `src/providers/registry.ts` | Path → provider lookup |
 | `src/core/publicMenu.ts` | Mongo shape → `PublicDayMenu` |
-| `src/core/docs.ts` | OpenAPI spec + Scalar |
 | `src/mcp/server.ts` | MCP tools (`bap_list_providers`, `bap_get_meals`, `bap_search_food`) |
 | `src/core/types.ts` | Public API types |
 | `src/core/version.ts` | `APP_VERSION` — OpenAPI, MCP, `package.json`과 동기화 |
@@ -55,8 +56,8 @@ Do this in **bap-back only**. Do not add `src/sites/{id}/` or hardcode the id in
    - **Corner** — `cornerMenuToPublic` (Mongo `meal.time` must equal `slot.title`)
    - **Custom** — map to `PublicDayMenu` yourself
    Use `getCachedMealDataOrThrow` + `saveMealData`. Never expose raw Mongo `data`.
-4. `reg.register(createXxxProvider())` in `init.ts` only. Do not add routes in `server.ts`.
-5. Parser/mapper tests; `bun test`. Scalar spec and MCP update from the registry — no hardcoded provider list in the spec.
+4. `reg.register(createXxxProvider())` in `init.ts` only. Do not add routes in `src/http/app.ts`.
+5. Parser/mapper tests; `bun test`. Scalar spec is generated from Elysia routes — no hardcoded provider list in the spec.
 6. Optional: `handleExtraRoute` + `features.foodSearch` for `/{id}/search/:food` (MCP `bap_search_food` reuses this).
 
 Full walkthrough: [README.md](./README.md#새-프로바이더-추가) · public docs: [api.밥.net/docs](https://api.밥.net/docs).
@@ -99,7 +100,7 @@ bun run lint
 ## Review checklist
 
 - [ ] `getMealData` returns `PublicDayMenu`
-- [ ] New routes registered via provider, not ad-hoc in `server.ts`
+- [ ] New routes registered via provider, not ad-hoc in `src/http/app.ts`
 - [ ] `presentation` complete for frontend catalog
 - [ ] Tests for new parse/map logic
 - [ ] README + OpenAPI (`GET /docs`) still accurate

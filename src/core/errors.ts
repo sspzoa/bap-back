@@ -1,5 +1,3 @@
-import { getCorsHeaders } from "@/core/cors";
-import { logger } from "@/core/logger";
 import { MEAL_ERROR_MESSAGES } from "@/core/mealErrors";
 
 export class ApiError extends Error {
@@ -25,24 +23,4 @@ export class MealNoOperationError extends ApiError {
     super(404, message);
     this.name = "MealNoOperationError";
   }
-}
-
-export function handleError(error: unknown, requestId?: string, origin: string | null = null): Response {
-  logger.error("Request error:", error);
-
-  const errorResponse = {
-    requestId: requestId || "unknown",
-    timestamp: new Date().toISOString(),
-    error: error instanceof ApiError ? error.message : "Internal server error",
-  };
-
-  const status = error instanceof ApiError ? error.status : 500;
-
-  return new Response(JSON.stringify(errorResponse), {
-    status,
-    headers: {
-      ...getCorsHeaders(origin),
-      "Content-Type": "application/json",
-    },
-  });
 }

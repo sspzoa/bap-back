@@ -15,6 +15,10 @@ export class ProviderRegistry {
     return this.providers;
   }
 
+  findById(id: string): MealProvider | undefined {
+    return this.providers.find((provider) => provider.config.id === id);
+  }
+
   findByPath(path: string): MealProvider | undefined {
     return this.providers
       .filter((provider) => matchesPrefix(path, provider.config.basePath))

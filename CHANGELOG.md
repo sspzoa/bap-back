@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-26
+
+### Changed
+
+- API — HTTP를 Elysia로 이전. `/docs` Scalar·OpenAPI는 라우트 스키마에서 생성
+
 ## [2.0.9] - 2026-08-26
 
 ### Changed

@@ -42,6 +42,12 @@ describe("ProviderRegistry path matching", () => {
     return reg;
   }
 
+  test("finds a provider by id", () => {
+    const reg = registry();
+    expect(reg.findById("kdmhs")?.config.id).toBe("kdmhs");
+    expect(reg.findById("missing")).toBeUndefined();
+  });
+
   test("matches each provider only by its own basePath", () => {
     const reg = registry();
     expect(reg.findByPath("/kdmhs/2026-08-20")?.config.id).toBe("kdmhs");
