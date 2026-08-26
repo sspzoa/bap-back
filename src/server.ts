@@ -1,7 +1,7 @@
 import { serve } from "bun";
 import { CONFIG } from "@/core/config";
 import { getCorsHeaders, handleCors, isMcpPath, withCors } from "@/core/cors";
-import { buildApiDocs } from "@/core/docs";
+import { buildOpenApiDocument, renderScalarHtml } from "@/core/docs";
 import { ApiError, handleError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import type { SchedulerHandle } from "@/core/scheduler";
@@ -77,17 +77,22 @@ export async function createServer() {
             return mcpResponse;
           }
 
-          if (path === "/docs" && method === "GET") {
-            const presentations = providers.map((provider) => provider.config.presentation);
-            const response = jsonResponse(
-              {
-                requestId,
-                timestamp: new Date().toISOString(),
-                providers: presentations,
-                docs: buildApiDocs(presentations, CONFIG.PUBLIC_API_URL, formatDate(new Date())),
+          if ((path === "/docs" || path === "/docs/") && method === "GET") {
+            const response = new Response(renderScalarHtml("/docs/openapi.json"), {
+              status: 200,
+              headers: {
+                ...getCorsHeaders(origin),
+                "Content-Type": "text/html; charset=utf-8",
               },
-              origin,
-            );
+            });
+            requestLogger.response(response.status, Date.now() - startTime);
+            return response;
+          }
+
+          if ((path === "/docs/openapi.json" || path === "/openapi.json") && method === "GET") {
+            const presentations = providers.map((provider) => provider.config.presentation);
+            const spec = buildOpenApiDocument(presentations, `${url.protocol}//${url.host}`, formatDate(new Date()));
+            const response = jsonResponse(spec, origin);
             requestLogger.response(response.status, Date.now() - startTime);
             return response;
           }

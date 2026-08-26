@@ -2,14 +2,14 @@
 
 [밥.net](https://밥.net) 식단 API. 학교·대학·구내식당마다 **프로바이더** 하나씩 등록하고, 공개 응답은 하나의 스키마로 통일합니다.
 
-웹 문서: [밥.net/docs](https://밥.net/docs) · 프론트: [bap-web](https://github.com/sspzoa/bap-web) · 에이전트: [AGENTS.md](./AGENTS.md)
+문서: [api.밥.net/docs](https://api.밥.net/docs) · 프론트: [bap-web](https://github.com/sspzoa/bap-web) · 에이전트: [AGENTS.md](./AGENTS.md)
 
 ## 아키텍처
 
 ```
 HTTP (server.ts)
   ├─ GET  /            카탈로그 (presentation[])
-  ├─ GET  /docs        공개 문서 JSON → 밥.net/docs
+  ├─ GET  /docs        Scalar (스펙: /docs/openapi.json)
   ├─ POST /mcp         MCP Streamable HTTP (같은 프로바이더 레이어)
   └─ ProviderRegistry ── kdmhs | dgu | horang | …
          ├─ scrape / parse / OCR  →  MongoDB (프로바이더별 DB)
@@ -44,7 +44,7 @@ bun run lint
 | `PORT` | `3000` | HTTP 포트 |
 | `MONGODB_URI` | `mongodb://localhost:27017` | Mongo 연결 문자열 |
 | `MINDLOGIC_KEY` | `""` | dgu·horang OCR (Mindlogic 게이트웨이) |
-| `PUBLIC_API_URL` | `https://api.밥.net` | 문서·curl 예시에 쓰는 공개 API URL |
+| `PUBLIC_API_URL` | `https://api.밥.net` | 공개 API 호스트 (미사용 시 Scalar server URL은 요청 호스트) |
 | `LOG_LEVEL` | `INFO` | 로그 레벨 |
 | `NODE_ENV` | — | `production`이면 CORS에서 localhost 제외 |
 
@@ -87,7 +87,7 @@ Docker 이미지는 `TZ=Asia/Seoul`. 식단은 **스케줄러**가 프로바이�
 
 ### `GET /docs`
 
-프론트 `/docs` 페이지가 불러오는 API 문서 JSON. `providers` + `docs`(TOC, 엔드포인트, 타입, 오류) 포함.
+Scalar. OpenAPI 스펙은 `GET /docs/openapi.json`. 등록된 프로바이더 id가 path enum에 들어갑니다.
 
 ### `GET /{provider}/{YYYY-MM-DD}`
 
@@ -142,9 +142,9 @@ Cursor (`~/.cursor/mcp.json` 또는 프로젝트 `.cursor/mcp.json`):
 
 | 도구 | 인자 | 설명 |
 |---|---|---|
-| `bap_list_providers` | — | 등록된 학교·식당과 끼니 슬롯 |
-| `bap_get_meals` | `provider`, `date?`, `meal?` | 날짜별 식단. `date` 생략 시 오늘(KST). `provider`는 id 또는 이름 |
-| `bap_search_food` | `food`, `provider?` | 메뉴 사진 검색 (`foodSearch` 프로바이더) |
+| `bap_list_providers` | — | 식당 id·끼니 슬롯·사진검색 지원 여부. 식단 질의 전에 id를 확정할 때 |
+| `bap_get_meals` | `provider`, `date?`, `meal?` | 하루(또는 한 끼) 식단. `date` 생략 시 오늘(KST). `오늘`/`내일`은 호출 전에 `YYYY-MM-DD`로 |
+| `bap_search_food` | `food`, `provider?` | 메뉴 이름으로 과거 급식 사진. 오늘 메뉴 목록이 아님 (`foodSearch` 프로바이더) |
 
 리소스: `bap://providers`, `bap://meals/{provider}/{date}`.
 
@@ -183,9 +183,9 @@ Mongo 문서 envelope (공통):
 
 ## 새 프로바이더 추가
 
-백엔드만 추가하면 됩니다. HTTP `/{id}/{date}`, `GET /` 카탈로그, `GET /docs`, MCP (`bap_list_providers` · `bap_get_meals`), 프론트 홈·docs·manifest가 **같은 presentation**으로 따라옵니다. bap-web에 `src/sites/{id}/` 나 프로바이더 id 하드코딩을 넣지 마세요.
+백엔드만 추가하면 됩니다. HTTP `/{id}/{date}`, `GET /` 카탈로그, `GET /docs` Scalar, MCP (`bap_list_providers` · `bap_get_meals`), 프론트 홈·manifest가 **같은 presentation**으로 따라옵니다. bap-web에 `src/sites/{id}/` 나 프로바이더 id 하드코딩을 넣지 마세요.
 
-공개 페이지 요약: [밥.net/docs#adding-provider](https://밥.net/docs#adding-provider)
+공개 문서: [api.밥.net/docs](https://api.밥.net/docs)
 
 ### 1. 디렉터리
 
@@ -256,7 +256,7 @@ src/providers/{id}/
 
 ```
 src/
-  core/          공통 타입, Mongo, publicMenu, docs, 스케줄러
+  core/          공통 타입, Mongo, publicMenu, OpenAPI/Scalar, 스케줄러
   mcp/           MCP 도구·리소스 (프로바이더 레이어 재사용)
   providers/     프로바이더별 scrape·service·config
   server.ts      HTTP 라우팅 (`/`, `/docs`, `/mcp`, `/{id}/…`)

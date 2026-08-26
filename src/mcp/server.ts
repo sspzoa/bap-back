@@ -2,12 +2,13 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { ApiError } from "@/core/errors";
 import type { PublicDayMenu, SitePresentation } from "@/core/types";
+import { APP_VERSION } from "@/core/version";
 import { resolveMeals, resolveProvider } from "@/mcp/resolve";
 import type { MealProvider } from "@/providers/types";
 import { formatDate, isValidDate } from "@/utils/date";
 
 export const MCP_SERVER_NAME = "밥.net";
-export const MCP_SERVER_VERSION = "1.0.0";
+export const MCP_SERVER_VERSION = APP_VERSION;
 
 export const MCP_TOOLS = {
   listProviders: "bap_list_providers",
@@ -158,11 +159,21 @@ export function createBapMcpServer(options: BapMcpOptions): McpServer {
     },
     {
       instructions: [
-        "밥.net은 한국 학교·대학·구내식당 식단 API입니다. 시간대는 Asia/Seoul (KST)입니다.",
-        "식단이 필요하면 bap_get_meals, 식당 목록·끼니 슬롯·검색 지원 여부는 bap_list_providers, 과거 메뉴 사진은 bap_search_food를 쓰세요.",
-        "provider는 id(kdmhs, dgu, horang) 또는 이름/키워드(디미고, 동국대, 호랑)입니다. 애매하면 bap_list_providers 후 id로 다시 호출하세요.",
-        "날짜는 반드시 YYYY-MM-DD입니다. '오늘/내일'은 호출 전에 KST 날짜로 바꾸세요.",
-        `등록된 프로바이더: ${catalog}`,
+        "밥.net turns Korean school, university, and workplace canteen menus into something an agent can read. Use this server whenever the user asks what is being served, wants a meal recommendation, or needs a photo of a dish — even if they never say 밥.net or a school id.",
+        "",
+        "Keep one-off trivia in chat. Reach for these tools when the answer should cite a real menu.",
+        "",
+        "When to use which tool:",
+        "- bap_list_providers — lock in a canteen id, meal slots, or whether photo search is supported. Call once per session unless the catalog may have changed.",
+        "- bap_get_meals — the default tool for a day's (or one slot's) menu text, corners, prices, kcal, and plated photos when the provider has them.",
+        "- bap_search_food — archive image search by dish name. Not today's menu list.",
+        "",
+        "How to use well:",
+        "- Timezone is always Asia/Seoul (KST). Convert '오늘/내일' and weekdays to YYYY-MM-DD before calling. Never send those words as date, and never invent a date.",
+        "- provider accepts an id (kdmhs, dgu, horang) or a name/keyword (디미고, 동국대, 호랑). If several places match, list providers and retry with the id. Do not guess.",
+        "- One canteen and one calendar day per call. For a range, call once per date.",
+        "",
+        `Registered providers: ${catalog}`,
       ].join("\n"),
     },
   );
@@ -172,11 +183,19 @@ export function createBapMcpServer(options: BapMcpOptions): McpServer {
     {
       title: "밥.net 등록된 식당 목록",
       description: [
-        "밥.net에 등록된 학교·대학·구내식당(프로바이더) 카탈로그를 반환합니다. 실제 메뉴 항목은 포함하지 않습니다.",
-        "언제: 사용자가 학교/식당을 말했지만 id가 불명확할 때, 끼니 슬롯(아침·중식·석식)이나 사진 검색 가능 여부를 확인할 때. bap_get_meals·bap_search_food보다 먼저 호출하세요.",
-        "반환: JSON { providers: [{ id, name, schoolName, basePath, description, features.foodSearch, meals: [{ id, title, operatingHours, activeUntilHour }] }] }",
-        "하지 않음: 날짜별 식단은 bap_get_meals. 메뉴 사진은 bap_search_food.",
-        `현재 등록: ${catalog}`,
+        "등록된 학교·대학·구내식당(프로바이더) 카탈로그를 반환합니다. 이름, 끼니 슬롯, 운영시간, 사진검색 지원 여부만 있고 실제 메뉴 항목은 없습니다. 식단 질의 전에 provider id를 확정할 때 쓰는 기본 도구입니다.",
+        "",
+        "When to use this vs other tools:",
+        "- Use this when the school/canteen id is unclear, or you need meal slots (아침·중식·석식) or whether photo search is supported.",
+        "- Use bap_get_meals when you need the actual menu items for a date.",
+        "- Use bap_search_food when you need a past meal photo, not today's menu text.",
+        "",
+        "How to use well:",
+        "- Call once to lock in an id, then pass that id to bap_get_meals / bap_search_food. Do not re-call in the same session if you already have the catalog.",
+        "- If the user named a school in Korean (디미고, 동국대, 호랑), still start here when you are not sure which id to send.",
+        "",
+        "Returns JSON { providers: [{ id, name, schoolName, basePath, description, features.foodSearch, meals: [{ id, title, operatingHours, activeUntilHour }] }] }",
+        `Currently registered: ${catalog}`,
       ].join("\n"),
       annotations: READ_ONLY,
     },
@@ -188,14 +207,34 @@ export function createBapMcpServer(options: BapMcpOptions): McpServer {
     {
       title: "밥.net 날짜별 식단",
       description: [
-        "한 식당의 하루 식단(메뉴 항목, 코너, 가격, 칼로리·사진이 있으면 포함)을 가져옵니다.",
-        "언제: '오늘 디미고 점심', '동국대 석식', '호랑 내일 메뉴'처럼 구체적인 식단이 필요할 때. id가 없으면 bap_list_providers로 확인하세요.",
-        "반환: JSON { provider: { id, name, schoolName }, date, meals: [{ id, title, operatingHours, kcal, image, groups: [{ id, label, price, items }] }] }",
-        "급식형(kdmhs 등): groups는 regular / plus(플러스바) / simple(간편식). kcal·image가 있을 수 있습니다.",
-        "코너형(dgu·horang 등): groups는 코너 이름, price(원). kcal·image는 보통 null.",
-        "오류: 프로바이더를 못 찾음(여러 곳이 맞으면 id로 재지정), 잘못된 날짜, '식단 정보가 없어요'(저장 범위 밖), '식단 운영이 없어요'(그날 휴무·미게시).",
-        "하지 않음: 과거 메뉴 사진 검색은 bap_search_food. 식당 목록은 bap_list_providers.",
-        `현재 등록: ${catalog}`,
+        "한 식당의 하루 식단을 가져옵니다. 메뉴 항목, 코너, 가격, 있으면 칼로리·사진까지 포함합니다. 식단 질의의 기본 도구입니다. 오늘 메뉴가 아니라 과거에 나온 메뉴 사진을 찾는 도구가 아닙니다.",
+        "",
+        "When to use this vs other tools:",
+        "- Use this for concrete menus: '오늘 디미고 점심', '동국대 석식', '호랑 내일 메뉴'.",
+        "- Use bap_list_providers first when the provider id is unknown or several places could match.",
+        "- Use bap_search_food when the user wants a photo of a dish ('김치전 사진', '이거 어떻게 생겼어'), not today's item list.",
+        "",
+        "How to use well:",
+        "- One canteen and one calendar day per call. For a date range, call once per date.",
+        "- Convert relative days ('오늘', '내일', '월요일') to YYYY-MM-DD in Asia/Seoul before calling. Do not guess a date string. Omit date to mean today (KST).",
+        "- Pass meal only when the user asked for a single slot. Slot id or title fragment: breakfast, lunch, dinner, 아침, 점심, 중식, 저녁, 석식. Omit to return every meal that day.",
+        "- Prefer a catalog id (kdmhs, dgu, horang) over a nickname once you have it.",
+        "",
+        "Provider shapes:",
+        "- Cafeteria (kdmhs): groups are regular / plus(플러스바) / simple(간편식). kcal and image may be present.",
+        "- Corner (dgu, horang): groups are corner names with price (KRW). kcal and image are usually null.",
+        "",
+        "Errors:",
+        "- Provider not found or ambiguous → call bap_list_providers, then retry with the id.",
+        "- Invalid date → not YYYY-MM-DD.",
+        "- '식단 정보가 없어요' → outside stored range.",
+        "- '식단 운영이 없어요' → in range but closed / not posted (방학·휴무).",
+        "",
+        "Returns JSON { provider: { id, name, schoolName }, date, meals: [{ id, title, operatingHours, kcal, image, groups: [{ id, label, price, items }] }] }",
+        "",
+        '<example description="오늘 디미고 점심">{"provider":"kdmhs","meal":"lunch"}</example>',
+        '<example description="동국대 내일 석식">{"provider":"dgu","date":"YYYY-MM-DD","meal":"dinner"}</example>',
+        `Currently registered: ${catalog}`,
       ].join("\n"),
       annotations: READ_ONLY,
       inputSchema: z.object({
@@ -203,19 +242,21 @@ export function createBapMcpServer(options: BapMcpOptions): McpServer {
           .string()
           .min(1)
           .describe(
-            "식당 id 또는 이름/키워드. 예: kdmhs, 디미고, dgu, 동국대, horang, 호랑. 여러 곳이 매칭되면 id로 다시 지정해야 합니다.",
+            "Canteen id or name/keyword. Prefer a catalog id once known: kdmhs, dgu, horang. Korean aliases also work (디미고, 동국대, 호랑). If several places match, do not guess — list providers and retry with the id. Do not pass an empty string.",
           ),
         date: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD")
           .optional()
-          .describe("조회 날짜 YYYY-MM-DD (KST). 생략하면 오늘. '내일' 같은 상대 표현은 호출 전에 변환하세요."),
+          .describe(
+            "Calendar date as YYYY-MM-DD in Asia/Seoul. Omit for today. Convert '오늘/내일' yourself before calling — never send those words, and never invent a date. Relative weekdays must be resolved in KST first.",
+          ),
         meal: z
           .string()
           .min(1)
           .optional()
           .describe(
-            "한 끼만 볼 때. 슬롯 id 또는 제목 일부: breakfast, lunch, dinner, 아침, 점심, 중식, 저녁, 석식. 생략하면 그날 전 끼니.",
+            "Optional single-slot filter. Accepts slot id or a title fragment: breakfast, lunch, dinner, 아침, 점심, 중식, 저녁, 석식. Omit to return every meal that day. Do not invent a slot that is not in the catalog.",
           ),
       }),
     },
@@ -233,22 +274,39 @@ export function createBapMcpServer(options: BapMcpOptions): McpServer {
     {
       title: "밥.net 메뉴 사진 검색",
       description: [
-        "메뉴 이름으로 과거에 나온 급식 사진을 찾습니다. 오늘의 식단 목록이 아니라 아카이브 이미지 검색입니다.",
-        "언제: '김치전 사진', '이 메뉴 어떻게 생겼어'처럼 이미지가 필요할 때. 오늘 메뉴 텍스트는 bap_get_meals.",
-        `제약: features.foodSearch가 true인 프로바이더만. 사진검색 가능: ${searchable}. 미지원 식당을 지정하면 에러입니다.`,
-        "반환: JSON { foodName, matchedMenu, image, date, mealType, section }. section은 kdmhs에서 regular | plus | simple.",
-        "오류: 메뉴를 찾지 못함, 프로바이더가 검색 미지원.",
-        `현재 등록: ${catalog}`,
+        "메뉴 이름으로 과거에 나온 급식 사진을 찾습니다. 가장 최근 매칭의 날짜·끼니·이미지 URL을 반환합니다. 오늘의 식단 목록이 아니라 아카이브 이미지 검색입니다. Partial match on the menu name.",
+        "",
+        "When to use this vs other tools:",
+        "- Use this when the user wants a photo: '김치전 사진', '이 메뉴 어떻게 생겼어', '예전에 나온 돈가스'.",
+        "- Use bap_get_meals for today's (or any day's) menu text, calories, corners, and prices.",
+        "- Use bap_list_providers to see which canteens have features.foodSearch before searching.",
+        "",
+        "How to use well:",
+        "- One dish name per call. Keep food short (김치전, 돈가스) — not a full sentence.",
+        `- Only works when features.foodSearch is true. Photo search available: ${searchable}. Passing an unsupported canteen returns an error.`,
+        "- Omit provider to use the first foodSearch-capable canteen. Prefer an explicit id when the user named a school.",
+        "",
+        "Errors: menu not found; provider does not support search.",
+        "",
+        "Returns JSON { foodName, matchedMenu, image, date, mealType, section }. section is kdmhs-only: regular | plus | simple.",
+        "",
+        '<example description="김치전 사진">{"food":"김치전","provider":"kdmhs"}</example>',
+        `Currently registered: ${catalog}`,
       ].join("\n"),
       annotations: READ_ONLY,
       inputSchema: z.object({
-        food: z.string().min(1).describe("찾을 메뉴 이름. 예: 김치전, 돈가스. 공백만이면 거절합니다."),
+        food: z
+          .string()
+          .min(1)
+          .describe(
+            "Dish name to look up, preferably a short noun (김치전, 돈가스). Partial match. Do not pass a full question or whitespace-only string.",
+          ),
         provider: z
           .string()
           .min(1)
           .optional()
           .describe(
-            `사진 검색할 식당 id 또는 이름. 생략 시 foodSearch를 지원하는 첫 프로바이더(${searchable || "없음"}).`,
+            `Canteen id or name that supports photo search. Omit to use the first foodSearch provider (${searchable || "none"}). Do not pass a canteen that does not support search — list providers first if unsure.`,
           ),
       }),
     },
@@ -290,7 +348,7 @@ export function createBapMcpServer(options: BapMcpOptions): McpServer {
     "bap://providers",
     {
       title: "등록된 식당 목록",
-      description: `bap_list_providers와 같은 카탈로그 JSON. 식단이 아니라 식당·끼니 슬롯 메타데이터입니다. 현재: ${catalog}`,
+      description: `Same catalog JSON as bap_list_providers — canteen metadata and meal slots, not daily menus. Read this to lock in an id before fetching meals. Currently: ${catalog}`,
       mimeType: "application/json",
     },
     async (uri) => ({
@@ -318,7 +376,7 @@ export function createBapMcpServer(options: BapMcpOptions): McpServer {
     {
       title: "날짜별 식단",
       description:
-        "bap_get_meals와 같은 하루 식단 JSON. URI는 bap://meals/{provider}/{date} 이고 date는 YYYY-MM-DD(KST)입니다. provider는 id 또는 이름.",
+        "Same daily menu JSON as bap_get_meals. URI is bap://meals/{provider}/{date}. date must be YYYY-MM-DD (KST). provider is an id or name. Convert '오늘/내일' before building the URI — do not put those words in the path.",
       mimeType: "application/json",
     },
     async (uri, variables) => {

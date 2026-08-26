@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { buildApiDocs } from "@/core/docs";
+import { buildOpenApiDocument, renderScalarHtml } from "@/core/docs";
+import { MEAL_ERROR_MESSAGES } from "@/core/mealErrors";
 import type { SitePresentation } from "@/core/types";
 
 const sampleProviders: SitePresentation[] = [
@@ -25,35 +26,41 @@ const sampleProviders: SitePresentation[] = [
   },
 ];
 
-describe("buildApiDocs", () => {
-  test("includes catalog and meal endpoints with curl examples", () => {
-    const docs = buildApiDocs(sampleProviders, "https://api.test", "2026-08-25");
+describe("buildOpenApiDocument", () => {
+  test("describes catalog, meals, search, health, and mcp", () => {
+    const spec = buildOpenApiDocument(sampleProviders, "https://api.test", "2026-08-25");
 
-    expect(docs.baseUrl).toBe("https://api.test");
-    expect(docs.endpoints.find((e) => e.id === "catalog")?.curls[0]).toContain("https://api.test/");
-    expect(docs.endpoints.find((e) => e.id === "meals")?.curls).toEqual([
-      "curl https://api.test/kdmhs/2026-08-25",
-      "curl https://api.test/dgu/2026-08-25",
-    ]);
-    expect(docs.endpoints.find((e) => e.id === "search")?.curls[0]).toContain("/kdmhs/search/");
-    expect(docs.endpoints.find((e) => e.id === "mcp")).toMatchObject({
-      method: "POST",
-      path: "/mcp",
-    });
-    expect(docs.endpoints.find((e) => e.id === "mcp")?.curls[0]).toContain("https://api.test/mcp");
-    expect(docs.subtitle).toContain("카탈로그");
-    expect(docs.subtitle).toContain("통일 식단 스키마");
-    expect(docs.toc.map((item) => item.id)).toContain("adding-provider");
-    expect(docs.guides[0]).toMatchObject({ id: "adding-provider" });
-    expect(docs.guides[0].steps.length).toBeGreaterThanOrEqual(5);
-    expect(docs.typeSchemas.map((schema) => schema.title)).toContain("SitePresentation");
+    expect(spec.openapi).toBe("3.1.0");
+    expect(spec.servers[0].url).toBe("https://api.test");
+    expect(spec.paths["/"]).toBeDefined();
+    expect(spec.paths["/{provider}/{date}"]).toBeDefined();
+    expect(spec.paths["/{provider}/search/{food}"]).toBeDefined();
+    expect(spec.paths["/{provider}/health"]).toBeDefined();
+    expect(spec.paths["/mcp"]).toBeDefined();
+    expect(spec.components.schemas.PublicDayMenu).toBeDefined();
+    expect(spec.components.schemas.SitePresentation).toBeDefined();
+    expect(JSON.stringify(spec)).toContain(MEAL_ERROR_MESSAGES.noMealData);
+    expect(JSON.stringify(spec)).toContain(MEAL_ERROR_MESSAGES.noMealOperation);
   });
 
-  test("lists error messages from mealErrors", () => {
-    const docs = buildApiDocs(sampleProviders, "https://api.test", "2026-08-25");
-    const messages = docs.errors.rows.map((row) => row.type);
+  test("uses registered provider ids as path enums", () => {
+    const spec = buildOpenApiDocument(sampleProviders, "https://api.test", "2026-08-25");
+    const meals = spec.paths["/{provider}/{date}"] as {
+      get: { parameters: { name: string; schema: { enum?: string[]; example?: string } }[] };
+    };
+    const providerParam = meals.get.parameters.find((parameter) => parameter.name === "provider");
 
-    expect(messages).toContain("식단 정보가 없어요");
-    expect(messages).toContain("식단 운영이 없어요");
+    expect(providerParam?.schema.enum).toEqual(["kdmhs", "dgu"]);
+    expect(providerParam?.schema.example).toBe("kdmhs");
+  });
+});
+
+describe("renderScalarHtml", () => {
+  test("embeds the spec url", () => {
+    const html = renderScalarHtml("/docs/openapi.json");
+
+    expect(html).toContain("@scalar/api-reference");
+    expect(html).toContain("Scalar.createApiReference");
+    expect(html).toContain("/docs/openapi.json");
   });
 });

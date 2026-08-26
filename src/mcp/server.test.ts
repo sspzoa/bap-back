@@ -101,7 +101,12 @@ describe("밥.net MCP", () => {
       MCP_TOOLS.listProviders,
       MCP_TOOLS.searchFood,
     ]);
-    expect(listed.tools.find((tool) => tool.name === MCP_TOOLS.getMeals)?.description).toContain("bap_search_food");
+    expect(listed.tools.find((tool) => tool.name === MCP_TOOLS.getMeals)?.description).toContain(
+      "When to use this vs other tools",
+    );
+    expect(listed.tools.find((tool) => tool.name === MCP_TOOLS.searchFood)?.description).toContain(
+      "When to use this vs other tools",
+    );
   });
 
   test("list_providers returns catalog entries", async () => {
@@ -122,7 +127,10 @@ describe("밥.net MCP", () => {
 
   test("get_meals surfaces domain 404s", async () => {
     const mcp = await client();
-    const result = await mcp.callTool({ name: MCP_TOOLS.getMeals, arguments: { provider: "kdmhs", date: "2020-01-01" } });
+    const result = await mcp.callTool({
+      name: MCP_TOOLS.getMeals,
+      arguments: { provider: "kdmhs", date: "2020-01-01" },
+    });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toBe("식단 정보가 없어요");
   });
