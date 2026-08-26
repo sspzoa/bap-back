@@ -58,7 +58,7 @@ function buildAddingProviderGuide(): ApiDocsGuide {
     id: "adding-provider",
     title: "새 프로바이더",
     intro:
-      "백엔드에 프로바이더 하나만 추가하면 HTTP API, MCP, 프론트 /select·홈·docs·manifest가 같은 카탈로그로 따라옵니다. bap-web에 사이트 폴더나 SITES 맵을 만들지 마세요.",
+      "백엔드에 프로바이더 하나만 추가하면 HTTP API, MCP, 프론트 홈·docs·manifest가 같은 카탈로그로 따라옵니다. bap-web에 사이트 폴더나 SITES 맵을 만들지 마세요.",
     steps: [
       {
         title: "1. id와 디렉터리",
@@ -100,7 +100,7 @@ cornerMenuToPublic(presentation.meals, mongoMeals)
       {
         title: "자동으로 따라오는 표면",
         rows: [
-          { name: "GET /", type: "catalog", description: "select, 홈, docs, PWA manifest" },
+          { name: "GET /", type: "catalog", description: "홈 사이트 선택, docs, PWA manifest" },
           { name: "GET /{id}/{date}", type: "meals", description: "통일 PublicDayMenu" },
           { name: "GET /{id}/health", type: "health", description: "문서 수·lastUpdated" },
           { name: "POST /mcp", type: "MCP", description: "bap_list_providers, bap_get_meals, bap:// 리소스" },

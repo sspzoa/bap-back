@@ -183,7 +183,7 @@ Mongo 문서 envelope (공통):
 
 ## 새 프로바이더 추가
 
-백엔드만 추가하면 됩니다. HTTP `/{id}/{date}`, `GET /` 카탈로그, `GET /docs`, MCP (`bap_list_providers` · `bap_get_meals`), 프론트 `/select`·홈·docs·manifest가 **같은 presentation**으로 따라옵니다. bap-web에 `src/sites/{id}/` 나 프로바이더 id 하드코딩을 넣지 마세요.
+백엔드만 추가하면 됩니다. HTTP `/{id}/{date}`, `GET /` 카탈로그, `GET /docs`, MCP (`bap_list_providers` · `bap_get_meals`), 프론트 홈·docs·manifest가 **같은 presentation**으로 따라옵니다. bap-web에 `src/sites/{id}/` 나 프로바이더 id 하드코딩을 넣지 마세요.
 
 공개 페이지 요약: [밥.net/docs#adding-provider](https://밥.net/docs#adding-provider)
 
