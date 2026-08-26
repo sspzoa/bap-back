@@ -67,7 +67,7 @@ Full walkthrough: [README.md](./README.md#새-프로바이더-추가) · public 
 
 - **단일 소스** — `src/core/version.ts`의 `APP_VERSION`. OpenAPI·MCP는 여기서 읽는다.
 - **함께 수정** — `package.json` `"version"`. **bap-web**도 같은 semver (`BRAND.version`, `package.json`).
-- **CHANGELOG** — 루트 `CHANGELOG.md`에 `## [버전] - YYYY-MM-DD` 섹션 추가. [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식. `GET /changelog`로 프론트에 전달 — **bap-back만** 수정한다.
+- **CHANGELOG** — 루트 `CHANGELOG.md`에 `## [버전] - YYYY-MM-DD` 섹션 추가. `GET /changelog`는 HTML 페이지. 프론트 홈 링크가 이 URL을 연다.
 - **규칙** — 기본은 patch +1 (`2.0.0` → `2.0.1`). 사용자-facing 기능 추가는 minor. `PublicDayMenu`·HTTP 계약 breaking은 major.
 - **체크** — 버전 bump 없이 푸시/커밋하지 않는다. CHANGELOG 없이 버전만 올리지 않는다.
 

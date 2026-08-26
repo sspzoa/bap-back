@@ -1,8 +1,21 @@
 # Changelog
 
-밥.net 프론트·API의 사용자-facing 변경 이력입니다. [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따릅니다. `GET /changelog`로 내려갑니다.
+밥.net 프론트·API의 사용자-facing 변경 이력입니다. [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따릅니다. `GET /changelog`에서 HTML로 볼 수 있습니다.
 
 ## [Unreleased]
+
+## [2.0.6] - 2026-08-26
+
+### Changed
+
+- `GET /changelog` — `CHANGELOG.md`를 `text/html` 페이지로 렌더링 (`marked`)
+
+## [2.0.5] - 2026-08-26
+
+### Changed
+
+- `GET /changelog` — JSON envelope 제거, `CHANGELOG.md` 원문을 `text/markdown`으로 서빙
+- 프론트 — CHANGELOG UI 제거, 하단 링크만 API 원문 URL로 연결
 
 ## [2.0.4] - 2026-08-26
 

@@ -89,15 +89,15 @@ export function buildOpenApiDocument(
       "/changelog": {
         get: {
           tags: ["Changelog"],
-          summary: "CHANGELOG 조회",
-          description: "루트 `CHANGELOG.md` 원문. 프론트 홈 업데이트 내역이 이 `markdown` 필드를 기본 마크다운으로 렌더합니다.",
+          summary: "CHANGELOG",
+          description: "루트 `CHANGELOG.md`를 HTML 페이지로 렌더링합니다. 프론트 홈 **CHANGELOG** 링크가 이 URL로 이동합니다.",
           operationId: "getChangelog",
           responses: {
             "200": {
-              description: "파싱된 CHANGELOG",
+              description: "CHANGELOG HTML 페이지",
               content: {
-                "application/json": {
-                  schema: { $ref: "#/components/schemas/ChangelogResponse" },
+                "text/html": {
+                  schema: { type: "string" },
                 },
               },
             },
@@ -300,16 +300,6 @@ export function buildOpenApiDocument(
             timestamp: { type: "string", format: "date-time" },
             message: { type: "string", example: "api.밥.net" },
             providers: { type: "array", items: { $ref: "#/components/schemas/SitePresentation" } },
-          },
-        },
-        ChangelogResponse: {
-          type: "object",
-          required: ["requestId", "timestamp", "version", "markdown"],
-          properties: {
-            requestId: { type: "string" },
-            timestamp: { type: "string", format: "date-time" },
-            version: { type: "string", example: APP_VERSION },
-            markdown: { type: "string", description: "CHANGELOG.md 원문 (Markdown)" },
           },
         },
         SitePresentation: {
