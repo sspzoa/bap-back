@@ -1,6 +1,6 @@
 import { getCorsHeaders } from "@/core/cors";
-import { MEAL_ERROR_MESSAGES } from "@/core/mealErrors";
 import { logger } from "@/core/logger";
+import { MEAL_ERROR_MESSAGES } from "@/core/mealErrors";
 
 export class ApiError extends Error {
   constructor(

@@ -1,6 +1,6 @@
 import { createDguProvider } from "@/providers/dgu";
-import { createKdmhsProvider } from "@/providers/kdmhs";
 import { createHorangProvider } from "@/providers/horang";
+import { createKdmhsProvider } from "@/providers/kdmhs";
 import { getRegistry, type ProviderRegistry } from "@/providers/registry";
 
 export function initializeRegistry(): ProviderRegistry {

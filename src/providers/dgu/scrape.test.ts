@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { enumerateWeekdays, findArticleForDate, type DflexArticle } from "./scrape";
+import { type DflexArticle, enumerateWeekdays, findArticleForDate } from "./scrape";
 
 function article(weekStart: string, weekEnd: string, seq = 1): DflexArticle {
   return { seq, title: `${weekStart} ~ ${weekEnd}`, weekStart, weekEnd };

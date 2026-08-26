@@ -4,11 +4,7 @@ import { MongoDBService } from "@/core/mongodb";
 import { cafeteriaToPublic } from "@/core/publicMenu";
 import type { PublicDayMenu } from "@/core/types";
 import { KDMHS_CONFIG } from "@/providers/kdmhs/config";
-import {
-  getCafeteriaData,
-  runKdmhsRefresh,
-  searchLatestFoodImage,
-} from "@/providers/kdmhs/service";
+import { getCafeteriaData, runKdmhsRefresh, searchLatestFoodImage } from "@/providers/kdmhs/service";
 import type { MealProvider } from "@/providers/types";
 
 export function createKdmhsProvider(): MealProvider {

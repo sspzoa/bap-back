@@ -86,14 +86,14 @@ function isDetailParagraph($: cheerio.CheerioAPI, p: AnyNode): boolean {
 }
 
 function hasMeaningfulCellContent($: cheerio.CheerioAPI, cell: cheerio.Cheerio<AnyNode>): boolean {
-  const detailParagraph = cell.find("p").filter((_, p) => isDetailParagraph($, p)).last();
+  const detailParagraph = cell
+    .find("p")
+    .filter((_, p) => isDetailParagraph($, p))
+    .last();
   return detailParagraph.length > 0 && detailParagraph.text().trim().length > 0;
 }
 
-function resolveDateColumns(
-  $: cheerio.CheerioAPI,
-  dateKey: string,
-): Array<{ cellIndex: number; date: string }> {
+function resolveDateColumns($: cheerio.CheerioAPI, dateKey: string): Array<{ cellIndex: number; date: string }> {
   const headerCells = $("thead tr").last().find("th, td").toArray();
 
   const columns = headerCells
@@ -149,7 +149,10 @@ function parseMealCell($: cheerio.CheerioAPI, cell: cheerio.Cheerio<AnyNode>): P
     }
   }
 
-  const detailParagraph = cell.find("p").filter((_, p) => isDetailParagraph($, p)).last();
+  const detailParagraph = cell
+    .find("p")
+    .filter((_, p) => isDetailParagraph($, p))
+    .last();
 
   if (detailParagraph.length === 0) {
     return { regular, simple, plus, image, kcal };
