@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-08-26
+
+### Fixed
+
+- 홈 — 예전 `Domain=.xn--rh3b.net` `bap-site-id` 쿠키까지 만료해 D-Flex 등 구형 선택값이 남지 않게 함
+
 ## [2.1.1] - 2026-08-26
 
 ### Fixed
