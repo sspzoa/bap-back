@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-08-26
+
+### Fixed
+
+- 프론트 CI — `bun:test` 테스트 파일을 Next 빌드 TypeScript 검사에서 제외
+
 ## [2.1.2] - 2026-08-26
 
 ### Fixed
