@@ -23,7 +23,7 @@ HTTP (Elysia, src/http/app.ts)
 ## 빠른 시작
 
 ```bash
-bun install
+bun install --frozen-lockfile
 MONGODB_URI=mongodb://127.0.0.1:27017 bun start   # 기본 :3000
 ```
 
