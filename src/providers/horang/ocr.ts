@@ -4,7 +4,7 @@ import type { MenuImage } from "@/providers/horang/scrape";
 import type { HorangMeal } from "@/providers/horang/types";
 
 const GATEWAY_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway";
-const OCR_MODEL = "gpt-5.6-luna";
+const OCR_MODEL = "gpt-6-luna";
 const TOOL_NAME = "submit_weekly_menu";
 
 interface OcrCorner {
