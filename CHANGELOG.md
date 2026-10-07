@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [2.1.6] - 2026-10-07
+
+### Changed
+
+- API — D-Flex·호랑에듀 주간 식단표 OCR 모델을 `gpt-5.6-luna`에서 `gpt-6-luna`로 교체
+
 ## [2.1.5] - 2026-09-14
 
 ### Security

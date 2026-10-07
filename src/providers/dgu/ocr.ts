@@ -6,7 +6,7 @@ import type { DguMeal } from "@/providers/dgu/types";
 // 마인드로직(동국대) 게이트웨이의 OpenAI Chat Completions 엔드포인트로 고정.
 const GATEWAY_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway";
 // 게이트웨이가 허용하는 모델만 사용 가능 (GET /v1/gateway/models/ 로 확인).
-const OCR_MODEL = "gpt-5.6-luna";
+const OCR_MODEL = "gpt-6-luna";
 const TOOL_NAME = "submit_weekly_menu";
 
 interface OcrCorner {
