@@ -7,20 +7,78 @@ import { formatDate } from "@/utils/date";
 import { extractWeekSource, isEmptyDay, parseWeekHtml } from "./parse";
 import { fetchWeekHtml } from "./scrape";
 import { findLatestFoodMatch } from "./search";
-import type { CafeteriaWeekData } from "./types";
+import type { CafeteriaWeekData, MealSource } from "./types";
 
-/** Extract the week with AI; fall back to the rule-based parser if the AI call or validation fails. */
+/**
+ * Extract the week, sending only meals whose raw text differs from the stored `source` to the AI.
+ * Unchanged meals keep their stored menus; if the AI call or validation fails, changed meals use
+ * the rule-based parser and are retried on the next refresh.
+ */
 export async function extractWeekData(
+  db: MongoDBService,
   html: string,
   dateKey: string,
   extract: typeof extractWeeklyMenu = extractWeeklyMenu,
 ): Promise<CafeteriaWeekData> {
+  const source = extractWeekSource(html, dateKey);
+  const stored: Record<string, CafeteriaData | null> = Object.fromEntries(
+    await Promise.all(source.dates.map(async (date) => [date, await db.getMealData<CafeteriaData>(date)] as const)),
+  );
+  const isUnchanged = (meal: MealSource) => stored[meal.date]?.[meal.mealType]?.source === meal.text;
+  const changed = source.meals.filter((meal) => !isUnchanged(meal));
+  logger.info(`KDMHS ${dateKey}: ${changed.length}/${source.meals.length} meals changed`);
+
+  let week: CafeteriaWeekData;
   try {
-    return await extract(extractWeekSource(html, dateKey));
+    week = await extract({ dates: source.dates, meals: changed });
+    for (const meal of changed) {
+      week[meal.date][meal.mealType].source = meal.text;
+    }
   } catch (error) {
     logger.error(`KDMHS AI extraction failed for ${dateKey}; falling back to HTML parser`, error);
-    return parseWeekHtml(html, dateKey);
+    week = parseWeekHtml(html, dateKey);
   }
+
+  for (const meal of source.meals.filter(isUnchanged)) {
+    week[meal.date][meal.mealType] = {
+      ...(stored[meal.date] as CafeteriaData)[meal.mealType],
+      image: meal.image,
+      kcal: meal.kcal,
+    };
+  }
+  return week;
+}
+
+/** Photo refresh: update today's image and kcal from the HTML without the AI, keeping stored menus. */
+export async function refreshTodayImages(
+  db: MongoDBService,
+  date: string,
+  fetchHtml: typeof fetchWeekHtml = fetchWeekHtml,
+): Promise<void> {
+  const stored = await db.getMealData<CafeteriaData>(date);
+  if (!stored) {
+    logger.warn(`KDMHS photo refresh skipped for ${date}: no stored menu yet`);
+    return;
+  }
+
+  const meals = extractWeekSource(await fetchHtml(date), date).meals.filter((meal) => meal.date === date);
+  let changed = false;
+  for (const { mealType, image, kcal } of meals) {
+    // Never replace a known photo or kcal with an empty value from a partial page.
+    if (image && stored[mealType].image !== image) {
+      stored[mealType].image = image;
+      changed = true;
+    }
+    if (kcal && stored[mealType].kcal !== kcal) {
+      stored[mealType].kcal = kcal;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await db.saveMealData(date, stored);
+  }
+  logger.info(`KDMHS photo refresh for ${date}: ${changed ? "updated" : "no changes"}`);
 }
 
 export async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<CafeteriaWeekData> {
@@ -29,7 +87,7 @@ export async function getWeekMealData(db: MongoDBService, dateKey: string): Prom
 
   try {
     const html = await fetchWeekHtml(dateKey);
-    const weekData = await extractWeekData(html, dateKey);
+    const weekData = await extractWeekData(db, html, dateKey);
     const dates = Object.keys(weekData);
 
     for (const date of dates) {
@@ -78,15 +136,18 @@ export async function runKdmhsRefresh(db: MongoDBService, refreshType: "today" |
     refreshLogger.info(`Starting KDMHS cafeteria data refresh (${refreshType})`);
 
     const today = new Date();
+    // "today" slots only pick up meal photos for the current day; menus refresh on "all".
+    if (refreshType === "today") {
+      await refreshTodayImages(db, formatDate(today));
+      timer("KDMHS photo refresh completed");
+      return;
+    }
+
     const thisWeekStart = new Date(today);
     thisWeekStart.setDate(today.getDate() - today.getDay());
-
-    const weekAnchors = [formatDate(thisWeekStart)];
-    if (refreshType === "all") {
-      const nextWeekStart = new Date(thisWeekStart);
-      nextWeekStart.setDate(thisWeekStart.getDate() + 7);
-      weekAnchors.push(formatDate(nextWeekStart));
-    }
+    const nextWeekStart = new Date(thisWeekStart);
+    nextWeekStart.setDate(thisWeekStart.getDate() + 7);
+    const weekAnchors = [formatDate(thisWeekStart), formatDate(nextWeekStart)];
 
     let successCount = 0;
     let errorCount = 0;

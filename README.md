@@ -29,7 +29,7 @@ MONGODB_URI=mongodb://127.0.0.1:27017 bun start   # 기본 :3000
 
 | 프로바이더 | 로컬에서 식단 적재 | 비고 |
 |---|---|---|
-| kdmhs | ✅ HTML 스크래핑 | `MINDLOGIC_KEY` 불필요 |
+| kdmhs | ✅ HTML 스크래핑 + AI 분류 | `MINDLOGIC_KEY` 없으면 규칙 기반 파서로 분류 |
 | dgu, horang | ❌ OCR 필요 | `MINDLOGIC_KEY` 없으면 refresh 실패 |
 
 ```bash
@@ -166,7 +166,7 @@ Cursor (`~/.cursor/mcp.json` 또는 프로젝트 `.cursor/mcp.json`):
 
 | ID | basePath | Mongo DB | 수집 | 끼니 |
 |---|---|---|---|---|
-| kdmhs | `/kdmhs` | `bap` | HTML | 아침·점심·저녁 |
+| kdmhs | `/kdmhs` | `bap` | HTML + AI | 아침·점심·저녁 |
 | dgu | `/dgu` | `dgu-bap` | OCR | 중·석 |
 | horang | `/horang` | `horang-bap` | OCR | 중·석 |
 
@@ -288,4 +288,5 @@ docker run -p 3000:3000 \
 
 - dgu·horang OCR 실패 시 `{ meals: [] }`를 저장해 200 빈 슬롯으로 나갈 수 있음
 - horang full refresh는 게시글 1페이지만 조회 (dgu는 2페이지)
+- kdmhs `today` refresh는 당일 사진·kcal만 갱신하므로, 낮에 바뀐 식단 텍스트는 다음 `all`(매일 03:00)에서 반영
 - dgu·horang 코드 중복 (공통 OCR 모듈화 여지)
