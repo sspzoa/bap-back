@@ -43,7 +43,7 @@ bun run lint
 |---|---|---|
 | `PORT` | `3000` | HTTP 포트 |
 | `MONGODB_URI` | `mongodb://localhost:27017` | Mongo 연결 문자열 |
-| `MINDLOGIC_KEY` | `""` | dgu·horang OCR (Mindlogic 게이트웨이) |
+| `MINDLOGIC_KEY` | `""` | dgu·horang OCR, kdmhs AI 분류 (Mindlogic 게이트웨이) |
 | `PUBLIC_API_URL` | `https://api.밥.net` | 공개 API 호스트 (미사용 시 Scalar server URL은 요청 호스트) |
 | `LOG_LEVEL` | `INFO` | 로그 레벨 |
 | `NODE_ENV` | — | `production`이면 CORS에서 localhost 제외 |
@@ -274,7 +274,7 @@ bun test
 
 ## 배포
 
-GitHub Actions → GHCR → Coolify. Docker:
+`main`에 푸시하면 Coolify가 저장소의 `Dockerfile`로 빌드·배포합니다. 수동 실행:
 
 ```bash
 docker build -t bap-back .

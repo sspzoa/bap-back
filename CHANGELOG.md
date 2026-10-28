@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [2.1.10] - 2026-10-28
+
+### Removed
+
+- 배포 — 러너가 없어 쓰이지 않던 GitHub Actions 배포 워크플로 제거. 배포는 `main` 푸시 후 Coolify 빌드로 진행
+
 ## [2.1.9] - 2026-10-28
 
 ### Changed
