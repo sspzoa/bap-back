@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isEmptyDay, parseWeekHtml } from "./parse";
+import { extractWeekSource, isEmptyDay, parseWeekHtml } from "./parse";
 
 const WEEK_HTML = `
 <table>
@@ -76,5 +76,30 @@ describe("parseWeekHtml", () => {
     expect(week["2026-08-16"]).toBeDefined();
     expect(week["2026-08-17"].lunch.regular).toEqual(["쌀밥"]);
     expect(isEmptyDay(week["2026-08-16"])).toBe(true);
+  });
+});
+
+describe("extractWeekSource", () => {
+  test("collects raw menu text with image and kcal for meals with content", () => {
+    const source = extractWeekSource(WEEK_HTML, "2026-08-17");
+
+    expect(source.dates).toEqual(["2026-08-17", "2026-08-18"]);
+    expect(source.meals).toEqual([
+      {
+        date: "2026-08-17",
+        mealType: "breakfast",
+        text: "흰쌀밥\n미역국\n<간편식> 샌드위치",
+        image: "https://dimigo-h.goeas.kr/meal/breakfast.jpg",
+        kcal: 450,
+      },
+      {
+        date: "2026-08-17",
+        mealType: "lunch",
+        text: "현미밥\n김치찌개\n<셀프바> 샐러드",
+        image: "",
+        kcal: 820,
+      },
+      { date: "2026-08-18", mealType: "lunch", text: "잡곡밥 / 된장국", image: "", kcal: 700 },
+    ]);
   });
 });

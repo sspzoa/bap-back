@@ -16,6 +16,19 @@ export interface CafeteriaWeekData {
   [date: string]: CafeteriaData;
 }
 
+export interface MealSource {
+  date: string;
+  mealType: keyof CafeteriaData;
+  text: string;
+  image: string;
+  kcal: number;
+}
+
+export interface WeekMenuSource {
+  dates: string[];
+  meals: MealSource[];
+}
+
 export interface MealDataDocument {
   _id: string;
   data: CafeteriaData;

@@ -1,20 +1,35 @@
 import { logger } from "@/core/logger";
 import { getCachedMealDataOrThrow } from "@/core/mealLookup";
 import type { MongoDBService } from "@/core/mongodb";
+import { extractWeeklyMenu } from "@/providers/kdmhs/ai";
 import type { CafeteriaData, FoodSearchResult, MealDataDocument } from "@/providers/kdmhs/types";
 import { formatDate } from "@/utils/date";
-import { isEmptyDay, parseWeekHtml } from "./parse";
+import { extractWeekSource, isEmptyDay, parseWeekHtml } from "./parse";
 import { fetchWeekHtml } from "./scrape";
 import { findLatestFoodMatch } from "./search";
 import type { CafeteriaWeekData } from "./types";
 
-async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<CafeteriaWeekData> {
+/** Extract the week with AI; fall back to the rule-based parser if the AI call or validation fails. */
+export async function extractWeekData(
+  html: string,
+  dateKey: string,
+  extract: typeof extractWeeklyMenu = extractWeeklyMenu,
+): Promise<CafeteriaWeekData> {
+  try {
+    return await extract(extractWeekSource(html, dateKey));
+  } catch (error) {
+    logger.error(`KDMHS AI extraction failed for ${dateKey}; falling back to HTML parser`, error);
+    return parseWeekHtml(html, dateKey);
+  }
+}
+
+export async function getWeekMealData(db: MongoDBService, dateKey: string): Promise<CafeteriaWeekData> {
   const mealLogger = logger.operation("parse-meal", dateKey);
   const timer = mealLogger.time();
 
   try {
     const html = await fetchWeekHtml(dateKey);
-    const weekData = parseWeekHtml(html, dateKey);
+    const weekData = await extractWeekData(html, dateKey);
     const dates = Object.keys(weekData);
 
     for (const date of dates) {

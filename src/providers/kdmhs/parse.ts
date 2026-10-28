@@ -2,7 +2,7 @@ import * as cheerio from "cheerio";
 import type { AnyNode } from "domhandler";
 import { logger } from "@/core/logger";
 import { KDMHS_WEBSITE, MEAL_TYPES } from "@/providers/kdmhs/config";
-import type { CafeteriaData, CafeteriaWeekData, ProcessedMeal } from "@/providers/kdmhs/types";
+import type { CafeteriaData, CafeteriaWeekData, ProcessedMeal, WeekMenuSource } from "@/providers/kdmhs/types";
 import { formatDate, parseLocalDate } from "@/utils/date";
 
 const parseMenu = (menuStr: string): string[] => {
@@ -130,11 +130,7 @@ function resolveDateColumns($: cheerio.CheerioAPI, dateKey: string): Array<{ cel
   });
 }
 
-function parseMealCell($: cheerio.CheerioAPI, cell: cheerio.Cheerio<AnyNode>): ProcessedMeal {
-  const regular: string[] = [];
-  const simple: string[] = [];
-  const plus: string[] = [];
-
+function parseCellMeta(cell: cheerio.Cheerio<AnyNode>): Pick<ProcessedMeal, "image" | "kcal"> {
   const kcalText = cell.find(".fm_tit_p").first().text().trim();
   const kcalMatch = kcalText.match(/([\d.]+)/);
   const kcal = kcalMatch ? Number.parseFloat(kcalMatch[1]) : 0;
@@ -149,17 +145,21 @@ function parseMealCell($: cheerio.CheerioAPI, cell: cheerio.Cheerio<AnyNode>): P
     }
   }
 
+  return { image, kcal };
+}
+
+function extractCellLines($: cheerio.CheerioAPI, cell: cheerio.Cheerio<AnyNode>): string[] {
   const detailParagraph = cell
     .find("p")
     .filter((_, p) => isDetailParagraph($, p))
     .last();
 
   if (detailParagraph.length === 0) {
-    return { regular, simple, plus, image, kcal };
+    return [];
   }
 
   const detailHtml = detailParagraph.html() || "";
-  const lines = detailHtml
+  return detailHtml
     .split(/<br\s*\/?>/i)
     .map((part) =>
       cheerio
@@ -169,10 +169,17 @@ function parseMealCell($: cheerio.CheerioAPI, cell: cheerio.Cheerio<AnyNode>): P
         .trim(),
     )
     .filter(Boolean);
+}
+
+function parseMealCell($: cheerio.CheerioAPI, cell: cheerio.Cheerio<AnyNode>): ProcessedMeal {
+  const regular: string[] = [];
+  const simple: string[] = [];
+  const plus: string[] = [];
+  const { image, kcal } = parseCellMeta(cell);
 
   let section: "regular" | "plus" | "simple" = "regular";
 
-  for (const rawLine of lines) {
+  for (const rawLine of extractCellLines($, cell)) {
     const line = rawLine.trim();
     if (!line) {
       continue;
@@ -209,9 +216,14 @@ function parseMealCell($: cheerio.CheerioAPI, cell: cheerio.Cheerio<AnyNode>): P
   return { regular, simple, plus, image, kcal };
 }
 
-export function parseWeekHtml(html: string, dateKey: string): CafeteriaWeekData {
-  const $ = cheerio.load(html);
+interface MealCell {
+  date: string;
+  mealType: keyof CafeteriaData;
+  cell: cheerio.Cheerio<AnyNode>;
+}
 
+/** Find the week's dates and every meal cell with menu content (later duplicates win). */
+function collectMealCells($: cheerio.CheerioAPI, dateKey: string): { dates: string[]; cells: MealCell[] } {
   const mealRows = $("tbody tr")
     .toArray()
     .map((row) => $(row))
@@ -228,13 +240,7 @@ export function parseWeekHtml(html: string, dateKey: string): CafeteriaWeekData 
     [MEAL_TYPES.DINNER]: "dinner",
   };
 
-  const weekData: CafeteriaWeekData = {};
-  for (const { date } of dateColumns) {
-    if (!weekData[date]) {
-      weekData[date] = createEmptyDay();
-    }
-  }
-
+  const cells = new Map<string, MealCell>();
   for (const rowEl of mealRows) {
     const mealTypeText = rowEl.find("th").first().text().trim();
     const mealKey = mealTypeMap[mealTypeText];
@@ -242,9 +248,9 @@ export function parseWeekHtml(html: string, dateKey: string): CafeteriaWeekData 
       continue;
     }
 
-    const cells = rowEl.find("td").toArray();
+    const rowCells = rowEl.find("td").toArray();
     for (const { cellIndex, date } of dateColumns) {
-      const targetCell = cells[cellIndex];
+      const targetCell = rowCells[cellIndex];
       if (!targetCell) {
         continue;
       }
@@ -253,14 +259,37 @@ export function parseWeekHtml(html: string, dateKey: string): CafeteriaWeekData 
         continue;
       }
 
-      const parsed = parseMealCell($, $(targetCell));
-      if (!weekData[date]) {
-        weekData[date] = createEmptyDay();
-      }
-
-      weekData[date][mealKey] = parsed;
+      cells.set(`${date}/${mealKey}`, { date, mealType: mealKey, cell: $(targetCell) });
     }
   }
 
+  return { dates: [...new Set(dateColumns.map(({ date }) => date))], cells: [...cells.values()] };
+}
+
+export function parseWeekHtml(html: string, dateKey: string): CafeteriaWeekData {
+  const $ = cheerio.load(html);
+  const { dates, cells } = collectMealCells($, dateKey);
+
+  const weekData: CafeteriaWeekData = Object.fromEntries(dates.map((date) => [date, createEmptyDay()]));
+  for (const { date, mealType, cell } of cells) {
+    weekData[date][mealType] = parseMealCell($, cell);
+  }
+
   return weekData;
+}
+
+/** Collect raw menu text per meal for AI extraction; image and kcal still come from the HTML. */
+export function extractWeekSource(html: string, dateKey: string): WeekMenuSource {
+  const $ = cheerio.load(html);
+  const { dates, cells } = collectMealCells($, dateKey);
+
+  return {
+    dates,
+    meals: cells.map(({ date, mealType, cell }) => ({
+      date,
+      mealType,
+      text: extractCellLines($, cell).join("\n"),
+      ...parseCellMeta(cell),
+    })),
+  };
 }
