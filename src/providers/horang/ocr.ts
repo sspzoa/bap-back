@@ -4,7 +4,7 @@ import type { MenuImage } from "@/providers/horang/scrape";
 import type { HorangMeal } from "@/providers/horang/types";
 
 const GATEWAY_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway";
-const OCR_MODEL = "deepseek-flash";
+const OCR_MODEL = "gpt-6-luna";
 const TOOL_NAME = "submit_weekly_menu";
 
 interface OcrCorner {
@@ -139,7 +139,7 @@ export async function extractWeeklyMenu(
 
   const response = await client.chat.completions.create({
     model: OCR_MODEL,
-    max_tokens: 16000,
+    max_completion_tokens: 16000,
     reasoning_effort: "none",
     tools: [MENU_TOOL],
     tool_choice: { type: "function", function: { name: TOOL_NAME } },
@@ -147,7 +147,7 @@ export async function extractWeeklyMenu(
       {
         role: "user",
         content: [
-          { type: "image_url", image_url: { url: `data:${image.mediaType};base64,${image.data}`, detail: "high" } },
+          { type: "image_url", image_url: { url: `data:${image.mediaType};base64,${image.data}` } },
           { type: "text", text: buildPrompt(expectedDates) },
         ],
       },

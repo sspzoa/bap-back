@@ -7,7 +7,7 @@ import type { CafeteriaWeekData, WeekMenuSource } from "@/providers/kdmhs/types"
 
 // Use the same Mindlogic gateway and model as the D-Flex and Horang providers.
 const GATEWAY_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway";
-const MENU_MODEL = "deepseek-flash";
+const MENU_MODEL = "gpt-6-luna";
 const TOOL_NAME = "submit_weekly_menu";
 
 const menuItems = z.array(z.string().trim().min(1));
@@ -87,10 +87,11 @@ export async function extractWeeklyMenu(source: WeekMenuSource): Promise<Cafeter
   });
   const response = await client.chat.completions.create({
     model: MENU_MODEL,
-    max_tokens: 16000,
+    max_completion_tokens: 16000,
     reasoning_effort: "none",
     tools: [MENU_TOOL],
     tool_choice: { type: "function", function: { name: TOOL_NAME } },
+    parallel_tool_calls: false,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: JSON.stringify({ meals }) },

@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [2.1.8] - 2026-10-28
+
+### Changed
+
+- D-Flex 학식·호랑에듀 구내식당 — 2.1.7의 DeepSeek 전환을 되돌려 OCR 모델을 다시 `gpt-6-luna`로 씀
+- 디미고 급식 — AI 식단 분류도 `gpt-6-luna`로 실행
+
 ## [2.1.7] - 2026-10-28
 
 ### Changed
