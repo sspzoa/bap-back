@@ -1,9 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { MealNoOperationError, MealNotFoundError } from "@/core/errors";
 import type { MongoDBService } from "@/core/mongodb";
-import { extractWeeklyMenu } from "@/providers/kdmhs/ai";
-import { extractWeekData, getCafeteriaData, refreshTodayImages } from "@/providers/kdmhs/service";
-import type { CafeteriaData, CafeteriaWeekData, WeekMenuSource } from "@/providers/kdmhs/types";
+import {
+  getCafeteriaData,
+  getWeekMealData,
+  kdmhsAllWeekAnchors,
+  refreshTodayImages,
+  runKdmhsRefresh,
+} from "@/providers/kdmhs/service";
+import type { CafeteriaData } from "@/providers/kdmhs/types";
+import { parseLocalDate } from "@/utils/date";
 
 function emptyDay(): CafeteriaData {
   const meal = { regular: [], simple: [], plus: [], image: "", kcal: 0 };
@@ -91,74 +97,35 @@ function memoryDb(docs: Record<string, CafeteriaData>) {
   return { db, saved };
 }
 
-function aiWeek(source: WeekMenuSource) {
-  const week: CafeteriaWeekData = Object.fromEntries(source.dates.map((date) => [date, emptyDay()]));
-  for (const meal of source.meals) {
-    week[meal.date][meal.mealType] = {
-      regular: [`AI ${meal.text}`],
-      simple: [],
-      plus: [],
-      image: meal.image,
-      kcal: meal.kcal,
-    };
-  }
-  return week;
-}
-
-describe("extractWeekData", () => {
-  test("sends only meals whose text changed and keeps stored menus for the rest", async () => {
-    const { db } = memoryDb({
-      "2026-08-17": storedDay({ regular: ["저장된 현미밥"], source: "현미밥 / 김치찌개", image: "old.jpg" }),
-    });
-    const sent: string[] = [];
-    const week = await extractWeekData(db, WEEK_HTML, "2026-08-17", async (source) => {
-      sent.push(...source.meals.map((meal) => `${meal.date}/${meal.mealType}`));
-      return aiWeek(source);
+describe("getWeekMealData", () => {
+  test("replaces stored menus with the rule parser and keeps a photo the page omits", async () => {
+    const { db, saved } = memoryDb({
+      "2026-08-17": storedDay({ regular: ["족발"], image: "kept.jpg", kcal: 1 }),
     });
 
-    expect(sent).toEqual(["2026-08-18/lunch", "2026-08-17/dinner"]);
-    expect(week["2026-08-17"].lunch).toEqual({
-      regular: ["저장된 현미밥"],
-      simple: [],
-      plus: [],
-      image: "https://dimigo-h.goeas.kr/meal/lunch.jpg",
-      kcal: 820,
-      source: "현미밥 / 김치찌개",
-    });
-    expect(week["2026-08-17"].dinner.regular).toEqual(["AI 카레라이스"]);
-    expect(week["2026-08-17"].dinner.source).toBe("카레라이스");
-  });
-
-  test("makes no AI request when nothing changed", async () => {
-    const { db } = memoryDb({
-      "2026-08-17": {
-        ...storedDay({ regular: ["저장된 현미밥"], source: "현미밥 / 김치찌개" }),
-        dinner: { regular: ["저장된 카레"], simple: [], plus: [], image: "", kcal: 0, source: "카레라이스" },
-      },
-      "2026-08-18": storedDay({ regular: ["저장된 잡곡밥"], source: "잡곡밥" }),
-    });
-    const requested: number[] = [];
-    const week = await extractWeekData(db, WEEK_HTML, "2026-08-17", async (source) => {
-      requested.push(source.meals.length);
-      return extractWeeklyMenu(source);
-    });
-
-    expect(requested).toEqual([0]);
-    expect(week["2026-08-17"].dinner.regular).toEqual(["저장된 카레"]);
-    expect(week["2026-08-18"].lunch.regular).toEqual(["저장된 잡곡밥"]);
-  });
-
-  test("falls back to the HTML parser for changed meals without recording their source", async () => {
-    const { db } = memoryDb({
-      "2026-08-18": storedDay({ regular: ["저장된 잡곡밥"], source: "잡곡밥" }),
-    });
-    const week = await extractWeekData(db, WEEK_HTML, "2026-08-17", async () => {
-      throw new Error("gateway down");
-    });
+    const week = await getWeekMealData(db, "2026-08-17", async () => WEEK_HTML);
 
     expect(week["2026-08-17"].lunch.regular).toEqual(["현미밥", "김치찌개"]);
-    expect(week["2026-08-17"].lunch.source).toBeUndefined();
-    expect(week["2026-08-18"].lunch.regular).toEqual(["저장된 잡곡밥"]);
+    expect(week["2026-08-17"].lunch.image).toBe("https://dimigo-h.goeas.kr/meal/lunch.jpg");
+    expect(week["2026-08-17"].lunch.kcal).toBe(820);
+    expect(week["2026-08-18"].lunch.regular).toEqual(["잡곡밥"]);
+    expect(saved.some(([date, data]) => date === "2026-08-17" && data.lunch.regular[0] === "현미밥")).toBe(true);
+  });
+
+  test("does not clear a stored photo or kcal when the new cell has neither", async () => {
+    const { db } = memoryDb({
+      "2026-08-18": storedDay({ regular: ["옛 잡곡밥"], image: "kept.jpg", kcal: 700 }),
+    });
+
+    const week = await getWeekMealData(db, "2026-08-17", async () => WEEK_HTML);
+
+    expect(week["2026-08-18"].lunch).toEqual({
+      regular: ["잡곡밥"],
+      simple: [],
+      plus: [],
+      image: "kept.jpg",
+      kcal: 700,
+    });
   });
 });
 
@@ -167,7 +134,7 @@ describe("refreshTodayImages", () => {
 
   test("updates only today's photo and kcal and keeps the stored menu", async () => {
     const { db, saved } = memoryDb({
-      "2026-08-17": storedDay({ regular: ["AI 현미밥"], source: "현미밥 / 김치찌개" }),
+      "2026-08-17": storedDay({ regular: ["현미밥", "김치찌개"] }),
     });
     await refreshTodayImages(db, "2026-08-17", fetchHtml);
 
@@ -175,12 +142,11 @@ describe("refreshTodayImages", () => {
     const [date, data] = saved[0];
     expect(date).toBe("2026-08-17");
     expect(data.lunch).toEqual({
-      regular: ["AI 현미밥"],
+      regular: ["현미밥", "김치찌개"],
       simple: [],
       plus: [],
       image: "https://dimigo-h.goeas.kr/meal/lunch.jpg",
       kcal: 820,
-      source: "현미밥 / 김치찌개",
     });
   });
 
@@ -200,5 +166,96 @@ describe("refreshTodayImages", () => {
     const { db, saved } = memoryDb({ "2026-08-18": storedDay({ image: "kept.jpg", kcal: 700 }) });
     await refreshTodayImages(db, "2026-08-18", fetchHtml);
     expect(saved).toHaveLength(0);
+  });
+});
+
+describe("kdmhsAllWeekAnchors", () => {
+  test("backfill covers every school week since 2026-10-25, then later runs keep the previous week", () => {
+    const sunday = parseLocalDate("2026-11-15");
+    expect(kdmhsAllWeekAnchors(sunday, true)).toEqual([
+      "2026-10-25",
+      "2026-11-01",
+      "2026-11-08",
+      "2026-11-15",
+      "2026-11-22",
+    ]);
+    expect(kdmhsAllWeekAnchors(sunday, false)).toEqual(["2026-11-08", "2026-11-15", "2026-11-22"]);
+    expect(kdmhsAllWeekAnchors(parseLocalDate("2026-11-18"), false)).toEqual([
+      "2026-11-08",
+      "2026-11-15",
+      "2026-11-22",
+    ]);
+  });
+});
+
+function weekPage(date: string): string {
+  return `<table><thead><tr><th>구분</th><th>${date}</th></tr></thead><tbody><tr><th>중식</th><td><p>쌀밥</p></td></tr></tbody></table>`;
+}
+
+function jobDb(initial: Record<string, CafeteriaData> = {}) {
+  const jobs = new Map<string, { completedAt: Date }>();
+  const meals = new Map(Object.entries(initial));
+  const db = {
+    getMealData: async (date: string) => (meals.has(date) ? structuredClone(meals.get(date)) : null),
+    saveMealData: async (date: string, data: CafeteriaData) => {
+      meals.set(date, structuredClone(data));
+    },
+    getDb: () => ({
+      collection: () => ({
+        findOne: async (filter: { _id: string }) => jobs.get(filter._id) ?? null,
+        updateOne: async (filter: { _id: string }) => {
+          if (!jobs.has(filter._id)) jobs.set(filter._id, { completedAt: new Date() });
+        },
+      }),
+    }),
+  } as unknown as MongoDBService;
+  return { db, jobs };
+}
+
+describe("runKdmhsRefresh", () => {
+  const now = parseLocalDate("2026-11-15");
+
+  test("re-parses weeks since 2026-10-25 once, then only the previous, current, and next weeks", async () => {
+    const { db, jobs } = jobDb();
+    const fetched: string[] = [];
+    const fetchHtml = async (date: string) => {
+      fetched.push(date);
+      return weekPage(date);
+    };
+
+    await runKdmhsRefresh(db, "all", { now, fetchHtml });
+    expect(fetched).toEqual(["2026-10-25", "2026-11-01", "2026-11-08", "2026-11-15", "2026-11-22"]);
+    expect(jobs.size).toBe(1);
+
+    fetched.length = 0;
+    await runKdmhsRefresh(db, "all", { now, fetchHtml });
+    expect(fetched).toEqual(["2026-11-08", "2026-11-15", "2026-11-22"]);
+    expect(jobs.size).toBe(1);
+  });
+
+  test("retries the backfill when a week fails", async () => {
+    const { db, jobs } = jobDb();
+    const fetchHtml = async (date: string) => {
+      if (date === "2026-11-01") throw new Error("down");
+      return weekPage(date);
+    };
+
+    await runKdmhsRefresh(db, "all", { now, fetchHtml });
+    expect(jobs.size).toBe(0);
+  });
+
+  test("today refresh only fetches the current day", async () => {
+    const { db, jobs } = jobDb({ "2026-11-15": storedDay({ regular: ["쌀밥"] }) });
+    const fetched: string[] = [];
+    await runKdmhsRefresh(db, "today", {
+      now,
+      fetchHtml: async (date) => {
+        fetched.push(date);
+        return weekPage(date);
+      },
+    });
+
+    expect(fetched).toEqual(["2026-11-15"]);
+    expect(jobs.size).toBe(0);
   });
 });

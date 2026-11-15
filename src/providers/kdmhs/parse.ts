@@ -2,19 +2,31 @@ import * as cheerio from "cheerio";
 import type { AnyNode } from "domhandler";
 import { logger } from "@/core/logger";
 import { KDMHS_WEBSITE, MEAL_TYPES } from "@/providers/kdmhs/config";
-import type { CafeteriaData, CafeteriaWeekData, ProcessedMeal, WeekMenuSource } from "@/providers/kdmhs/types";
+import type { CafeteriaData, CafeteriaWeekData, ProcessedMeal } from "@/providers/kdmhs/types";
 import { formatDate, parseLocalDate } from "@/utils/date";
+
+/**
+ * Allergy codes are `1.2.5` or `(5.6)`, including a trailing dot (`6.9.`).
+ * A wrapped line is only those codes (`5.6`, `5.`). `2종시리얼` and `마.계토스트` stay.
+ * The code may start the string; a dot counts as a non-digit, so a lookbehind-only
+ * pattern would leave `5.` behind from `5.6`.
+ */
+const ALLERGY_NUMBERS = /\d{1,2}(?:\.\d{1,2})*\.?/;
+const ALLERGY_TAIL = new RegExp(String.raw`(?:^|(?<=\D))${ALLERGY_NUMBERS.source}(?=(?:or|OR|$|\s|[,&/]))`, "g");
+const ALLERGY_PARENS = new RegExp(String.raw`\(\s*${ALLERGY_NUMBERS.source}\s*\)`, "g");
+const ALLERGY_ONLY = new RegExp(`^${ALLERGY_NUMBERS.source}$`);
 
 const parseMenu = (menuStr: string): string[] => {
   if (!menuStr) return [];
 
   const sanitizeMenuItem = (item: string): string => {
-    return item
+    const cleaned = item
       .replaceAll(/\u00A0/g, " ")
-      .replace(/\(\s*\d{1,2}(?:\.\d{1,2})*\s*\)/g, "")
-      .replace(/(?<=\D)\d{1,2}(?:\.\d{1,2})*(?=(?:or|OR|$|\s|[,&/]))/g, "")
+      .replace(ALLERGY_PARENS, "")
+      .replace(ALLERGY_TAIL, "")
       .replace(/\s{2,}/g, " ")
       .trim();
+    return ALLERGY_ONLY.test(cleaned) ? "" : cleaned;
   };
 
   const items: string[] = [];
@@ -276,20 +288,4 @@ export function parseWeekHtml(html: string, dateKey: string): CafeteriaWeekData 
   }
 
   return weekData;
-}
-
-/** Collect raw menu text per meal for AI extraction; image and kcal still come from the HTML. */
-export function extractWeekSource(html: string, dateKey: string): WeekMenuSource {
-  const $ = cheerio.load(html);
-  const { dates, cells } = collectMealCells($, dateKey);
-
-  return {
-    dates,
-    meals: cells.map(({ date, mealType, cell }) => ({
-      date,
-      mealType,
-      text: extractCellLines($, cell).join("\n"),
-      ...parseCellMeta(cell),
-    })),
-  };
 }
