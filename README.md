@@ -29,7 +29,7 @@ MONGODB_URI=mongodb://127.0.0.1:27017 bun start   # 기본 :3000
 
 | 프로바이더 | 로컬에서 식단 적재 | 비고 |
 |---|---|---|
-| kdmhs | ✅ HTML 스크래핑 + AI 분류 | `MINDLOGIC_KEY` 없으면 규칙 기반 파서로 분류 |
+| kdmhs | ✅ HTML 스크래핑 | 규칙 기반 파서. AI 분류 없음 |
 | dgu, horang | ❌ OCR 필요 | `MINDLOGIC_KEY` 없으면 refresh 실패 |
 
 ```bash
@@ -43,7 +43,7 @@ bun run lint
 |---|---|---|
 | `PORT` | `3000` | HTTP 포트 |
 | `MONGODB_URI` | `mongodb://localhost:27017` | Mongo 연결 문자열 |
-| `MINDLOGIC_KEY` | `""` | dgu·horang OCR, kdmhs AI 분류 (Mindlogic 게이트웨이) |
+| `MINDLOGIC_KEY` | `""` | dgu·horang OCR (Mindlogic 게이트웨이, `gpt-6-luna`). kdmhs는 사용하지 않음 |
 | `PUBLIC_API_URL` | `https://api.밥.net` | 공개 API 호스트 (미사용 시 Scalar server URL은 요청 호스트) |
 | `LOG_LEVEL` | `INFO` | 로그 레벨 |
 | `NODE_ENV` | — | `production`이면 CORS에서 localhost 제외 |
@@ -166,7 +166,7 @@ Cursor (`~/.cursor/mcp.json` 또는 프로젝트 `.cursor/mcp.json`):
 
 | ID | basePath | Mongo DB | 수집 | 끼니 |
 |---|---|---|---|---|
-| kdmhs | `/kdmhs` | `bap` | HTML + AI | 아침·점심·저녁 |
+| kdmhs | `/kdmhs` | `bap` | HTML | 아침·점심·저녁 |
 | dgu | `/dgu` | `dgu-bap` | OCR | 중·석 |
 | horang | `/horang` | `horang-bap` | OCR | 중·석 |
 
@@ -288,5 +288,5 @@ docker run -p 3000:3000 \
 
 - dgu·horang OCR 실패 시 `{ meals: [] }`를 저장해 200 빈 슬롯으로 나갈 수 있음
 - horang full refresh는 게시글 1페이지만 조회 (dgu는 2페이지)
-- kdmhs `today` refresh는 당일 사진·kcal만 갱신하므로, 낮에 바뀐 식단 텍스트는 다음 `all`(매일 03:00)에서 반영
+- kdmhs `today` refresh는 당일 사진·kcal만 갱신함. `all`(기동 직후, 이후 매일 03:00)은 지난주·이번주·다음주를 규칙 파서로 다시 수집함. 2026-10-28이 들어 있는 주부터의 한 번짜리 재수집은 `bap.kdmhs_jobs`의 `kdmhs-rule-parser-since-2026-10-28`이 생긴 뒤에 생략됨
 - dgu·horang 코드 중복 (공통 OCR 모듈화 여지)

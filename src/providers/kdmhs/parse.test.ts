@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { extractWeekSource, isEmptyDay, parseWeekHtml } from "./parse";
+import { isEmptyDay, parseWeekHtml } from "./parse";
 
 const WEEK_HTML = `
 <table>
@@ -79,27 +79,41 @@ describe("parseWeekHtml", () => {
   });
 });
 
-describe("extractWeekSource", () => {
-  test("collects raw menu text with image and kcal for meals with content", () => {
-    const source = extractWeekSource(WEEK_HTML, "2026-08-17");
+describe("parseWeekHtml allergy codes", () => {
+  test("drops wrapped allergy numbers and keeps food names that contain digits", () => {
+    const html = `
+      <table>
+        <thead><tr><th>구분</th><th>2026-11-14 (토)</th></tr></thead>
+        <tbody>
+          <tr>
+            <th>중식</th>
+            <td>
+              <p class="fm_tit_p">895Kcal</p>
+              <p class=""><뚝배기>왕갈비탕1.5.6.16<br/>칼슘강화쌀밥<br/>수제녹두빈대떡&amp;양파장5.6.9.10<br/>갈치소금구이<br/>5.6<br/>크런치미니치킨카츠<br/>2.5.6.15.16<br/>깍두기6.9.<br/>혼합잡곡밥 (5)<br/>마.계토스트1.2.5.6.10<br/>2종시리얼2.5.6.13/오트밀<br/>우유2or저지방우유2or주스12<br/>어두부전*선택)소스2종<br/>비타민C<br/><플러스바><br/>쌀밥<br/><간편식><br/>선식<br/>5.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
 
-    expect(source.dates).toEqual(["2026-08-17", "2026-08-18"]);
-    expect(source.meals).toEqual([
-      {
-        date: "2026-08-17",
-        mealType: "breakfast",
-        text: "흰쌀밥\n미역국\n<간편식> 샌드위치",
-        image: "https://dimigo-h.goeas.kr/meal/breakfast.jpg",
-        kcal: 450,
-      },
-      {
-        date: "2026-08-17",
-        mealType: "lunch",
-        text: "현미밥\n김치찌개\n<셀프바> 샐러드",
-        image: "",
-        kcal: 820,
-      },
-      { date: "2026-08-18", mealType: "lunch", text: "잡곡밥 / 된장국", image: "", kcal: 700 },
+    const lunch = parseWeekHtml(html, "2026-11-14")["2026-11-14"].lunch;
+    expect(lunch.kcal).toBe(895);
+    expect(lunch.regular).toEqual([
+      "<뚝배기>왕갈비탕",
+      "칼슘강화쌀밥",
+      "수제녹두빈대떡&양파장",
+      "갈치소금구이",
+      "크런치미니치킨카츠",
+      "깍두기",
+      "혼합잡곡밥",
+      "마.계토스트",
+      "2종시리얼",
+      "오트밀",
+      "우유or저지방우유or주스",
+      "어두부전*선택)소스2종",
+      "비타민C",
     ]);
+    expect(lunch.plus).toEqual(["쌀밥"]);
+    expect(lunch.simple).toEqual(["선식"]);
   });
 });

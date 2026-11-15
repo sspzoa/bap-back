@@ -4,8 +4,6 @@ export interface ProcessedMeal {
   plus: string[];
   image: string;
   kcal: number;
-  /** Raw menu text the AI result came from; unchanged text skips the AI on the next refresh. */
-  source?: string;
 }
 
 export interface CafeteriaData {
@@ -16,19 +14,6 @@ export interface CafeteriaData {
 
 export interface CafeteriaWeekData {
   [date: string]: CafeteriaData;
-}
-
-export interface MealSource {
-  date: string;
-  mealType: keyof CafeteriaData;
-  text: string;
-  image: string;
-  kcal: number;
-}
-
-export interface WeekMenuSource {
-  dates: string[];
-  meals: MealSource[];
 }
 
 export interface MealDataDocument {
