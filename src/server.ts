@@ -1,5 +1,6 @@
 import { CONFIG } from "@/core/config";
 import { logger } from "@/core/logger";
+import { PARTNER_AD_DB, PartnerAdStats } from "@/core/partnerAdStats";
 import type { SchedulerHandle } from "@/core/scheduler";
 import { setupScheduler } from "@/core/scheduler";
 import { createApp } from "@/http/app";
@@ -19,8 +20,14 @@ export async function createServer() {
     }
 
     const schedulerHandles: (SchedulerHandle | null)[] = [];
+    const statsProvider = providers.find((provider) => provider.config.dbName === PARTNER_AD_DB);
+    if (!statsProvider) {
+      throw new Error(`Partner ad stats need the existing ${PARTNER_AD_DB} database`);
+    }
+    const partnerAds = new PartnerAdStats(statsProvider.db);
+    await partnerAds.ensureIndexes();
     const mcpHandler = createBapMcpHandler({ sources: sourcesFromProviders(providers) });
-    const app = createApp({ registry, mcpHandler });
+    const app = createApp({ registry, mcpHandler, partnerAds });
 
     app.listen(CONFIG.SERVER.PORT);
 

@@ -124,6 +124,10 @@ DB 문서 수·마지막 갱신 시각. `database.connected`는 현재 **항상 
 
 과거 메뉴 사진 검색 (kdmhs 전용).
 
+### `POST /partner-ads/events`
+
+제휴 배너 노출·클릭. 본문 `{ "siteId", "slot", "type" }`. `type` 은 `impression` 또는 `click`. 슬롯은 `mobile-<끼니 id>` 또는 `pc`. 서울 날짜 기준 `bap.partner_ad_daily` 카운터만 증가합니다. 프론트(`밥.net`) Origin 이 아닌 요청과 봇 User-Agent 는 저장하지 않습니다.
+
 ### `POST /mcp`
 
 [MCP](https://modelcontextprotocol.io) Streamable HTTP. Cursor·Claude 등 에이전트가 같은 식단 데이터를 도구로 호출합니다. 인증 없음.
