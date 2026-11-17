@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { MealNotFoundError } from "@/core/errors";
 import type { MongoDBService } from "@/core/mongodb";
+import { seoulDate } from "@/core/partnerAdEvent";
+import type { PartnerAdDailyEvent, PartnerAdRecorder } from "@/core/partnerAdStats";
 import { APP_VERSION } from "@/core/version";
 import { createApp } from "@/http/app";
 import { ProviderRegistry } from "@/providers/registry";
@@ -49,7 +51,10 @@ function fakeProvider(id: string, overrides: Partial<MealProvider> = {}): MealPr
   };
 }
 
-function testApp(providers: MealProvider[] = [fakeProvider("kdmhs"), fakeProvider("dgu")]) {
+function testApp(
+  providers: MealProvider[] = [fakeProvider("kdmhs"), fakeProvider("dgu")],
+  partnerAds?: PartnerAdRecorder,
+) {
   const registry = new ProviderRegistry();
   for (const provider of providers) {
     registry.register(provider);
@@ -57,6 +62,7 @@ function testApp(providers: MealProvider[] = [fakeProvider("kdmhs"), fakeProvide
 
   return createApp({
     registry,
+    partnerAds,
     mcpHandler: {
       fetch: async (request) => {
         const body = await request.text();
@@ -176,6 +182,51 @@ describe("Elysia app", () => {
     expect(spec.paths["/{provider}/search/{food}"]).toBeDefined();
     expect(spec.paths["/{provider}/health"]).toBeDefined();
     expect(spec.paths["/mcp"]).toBeDefined();
+    expect(spec.paths["/partner-ads/events"]).toBeDefined();
+  });
+
+  test("POST /partner-ads/events records one daily counter and ignores bots", async () => {
+    const recorded: PartnerAdDailyEvent[] = [];
+    const app = testApp([fakeProvider("kdmhs")], {
+      record: async (event) => {
+        recorded.push(event);
+      },
+    });
+    const browser = {
+      Origin: "https://xn--rh3b.net",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0",
+      "Content-Type": "text/plain;charset=UTF-8",
+    };
+
+    const accepted = await app.handle(
+      new Request("http://localhost/partner-ads/events", {
+        method: "POST",
+        headers: browser,
+        body: JSON.stringify({ siteId: "kdmhs", slot: "mobile-lunch", type: "impression" }),
+      }),
+    );
+    const bot = await app.handle(
+      new Request("http://localhost/partner-ads/events", {
+        method: "POST",
+        headers: { ...browser, "User-Agent": "curl/8.0" },
+        body: JSON.stringify({ siteId: "kdmhs", slot: "pc", type: "click" }),
+      }),
+    );
+    const invalid = await app.handle(
+      new Request("http://localhost/partner-ads/events", {
+        method: "POST",
+        headers: browser,
+        body: JSON.stringify({ siteId: "kdmhs", slot: "mobile-breakfast", type: "click" }),
+      }),
+    );
+
+    expect(accepted.status).toBe(204);
+    expect(accepted.headers.get("access-control-allow-origin")).toBe("https://xn--rh3b.net");
+    expect(bot.status).toBe(204);
+    expect(invalid.status).toBe(400);
+    expect(recorded).toEqual([
+      { siteId: "kdmhs", date: seoulDate(new Date()), slot: "mobile-lunch", type: "impression" },
+    ]);
   });
 
   test("POST /mcp forwards the raw body", async () => {

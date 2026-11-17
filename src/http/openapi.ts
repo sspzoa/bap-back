@@ -53,4 +53,5 @@ export const openapiTags = [
   { name: "Search", description: "메뉴 이름으로 과거 급식 사진 찾기 (`foodSearch` 지원 프로바이더 전용)" },
   { name: "Health", description: "프로바이더별 데이터 적재 상태" },
   { name: "MCP", description: "AI 에이전트용 Model Context Protocol 엔드포인트" },
+  { name: "Ads", description: "제휴 배너 노출·클릭 일별 카운터" },
 ];
