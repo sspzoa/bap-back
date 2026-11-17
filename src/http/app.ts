@@ -42,6 +42,40 @@ function requireProvider(registry: ProviderRegistry, id: string, requestId: stri
 }
 
 export function createApp({ registry, mcpHandler, partnerAds }: AppDeps) {
+  const recordPartnerAdEvent = async (
+    request: Request,
+    requestId: string,
+    timestamp: string,
+    set: { status?: number | string },
+  ) => {
+    const decision = decidePartnerAdEvent({
+      raw: await request.text(),
+      origin: request.headers.get("origin"),
+      userAgent: request.headers.get("user-agent"),
+      origins: allowedFrontendOrigins(),
+      mealsFor: (siteId) => registry.findById(siteId)?.config.presentation.meals ?? null,
+    });
+
+    if (!decision.event) {
+      if (decision.error) {
+        set.status = decision.status;
+        return { requestId, timestamp, error: decision.error };
+      }
+
+      set.status = 204;
+      return null;
+    }
+
+    if (!partnerAds) {
+      set.status = 503;
+      return { requestId, timestamp, error: "Partner ad stats are unavailable" };
+    }
+
+    await partnerAds.record(decision.event);
+    set.status = 204;
+    return null;
+  };
+
   return new Elysia({ name: "bap-api" })
     .decorate("registry", registry)
     .decorate("mcpHandler", mcpHandler)
@@ -149,47 +183,28 @@ export function createApp({ registry, mcpHandler, partnerAds }: AppDeps) {
         )
         .post(
           "/partner-ads/events",
-          async ({ request, requestId, timestamp, set }) => {
-            const decision = decidePartnerAdEvent({
-              raw: await request.text(),
-              origin: request.headers.get("origin"),
-              userAgent: request.headers.get("user-agent"),
-              origins: allowedFrontendOrigins(),
-              mealsFor: (siteId) => registry.findById(siteId)?.config.presentation.meals ?? null,
-            });
-
-            if (!decision.event) {
-              if (decision.error) {
-                set.status = decision.status;
-                return { requestId, timestamp, error: decision.error };
-              }
-
-              set.status = 204;
-              return null;
-            }
-
-            if (!partnerAds) {
-              set.status = 503;
-              return { requestId, timestamp, error: "Partner ad stats are unavailable" };
-            }
-
-            await partnerAds.record(decision.event);
-            set.status = 204;
-            return null;
-          },
+          ({ request, requestId, timestamp, set }) => recordPartnerAdEvent(request, requestId, timestamp, set),
           {
             parse: "none",
             detail: {
               tags: ["Ads"],
               summary: "제휴 배너 노출·클릭 기록",
               description: [
-                "급식 화면의 제휴 배너가 뷰포트에 보이거나 클릭되면 브라우저가 이 주소로 보냅니다.",
+                "급식 화면의 제휴 배너가 뷰포트에 보이거나 클릭되면 브라우저가 이 주소로 보냅니다. 같은 동작의 중립 경로는 `POST /c/hit`입니다.",
                 "본문은 `{ siteId, slot, type }` 이고 `type` 은 `impression` 또는 `click` 입니다.",
                 "슬롯은 `mobile-<끼니 id>`(디미고는 `mobile-breakfast`, `mobile-lunch`, `mobile-dinner`) 또는 데스크톱 `pc` 입니다.",
                 "날짜는 서버의 서울 달력으로 붙고, `bap.partner_ad_daily` 일별 카운터만 올립니다. IP와 User-Agent는 저장하지 않습니다.",
               ].join("\n"),
               operationId: "recordPartnerAdEvent",
             },
+          },
+        )
+        .post(
+          "/c/hit",
+          ({ request, requestId, timestamp, set }) => recordPartnerAdEvent(request, requestId, timestamp, set),
+          {
+            parse: "none",
+            detail: { hide: true },
           },
         )
         .get("/openapi.json", ({ redirect }) => redirect("/docs/openapi.json"), {

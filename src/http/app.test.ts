@@ -183,6 +183,7 @@ describe("Elysia app", () => {
     expect(spec.paths["/{provider}/health"]).toBeDefined();
     expect(spec.paths["/mcp"]).toBeDefined();
     expect(spec.paths["/partner-ads/events"]).toBeDefined();
+    expect(spec.paths["/c/hit"]).toBeUndefined();
   });
 
   test("POST /partner-ads/events records one daily counter and ignores bots", async () => {
@@ -219,13 +220,22 @@ describe("Elysia app", () => {
         body: JSON.stringify({ siteId: "kdmhs", slot: "mobile-breakfast", type: "click" }),
       }),
     );
+    const neutral = await app.handle(
+      new Request("http://localhost/c/hit", {
+        method: "POST",
+        headers: browser,
+        body: JSON.stringify({ siteId: "kdmhs", slot: "pc", type: "click" }),
+      }),
+    );
 
     expect(accepted.status).toBe(204);
     expect(accepted.headers.get("access-control-allow-origin")).toBe("https://xn--rh3b.net");
     expect(bot.status).toBe(204);
     expect(invalid.status).toBe(400);
+    expect(neutral.status).toBe(204);
     expect(recorded).toEqual([
       { siteId: "kdmhs", date: seoulDate(new Date()), slot: "mobile-lunch", type: "impression" },
+      { siteId: "kdmhs", date: seoulDate(new Date()), slot: "pc", type: "click" },
     ]);
   });
 
